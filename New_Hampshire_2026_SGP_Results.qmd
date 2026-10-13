@@ -1,0 +1,1244 @@
+---
+title: "New Hampshire 2026 SGP Results"
+subtitle: "NH SAS (Grades 3–8) and WIDA ACCESS"
+author:
+  - name: "Damian W. Betebenner"
+    affiliation: "National Center for the Improvement of Educational Assessment"
+date: 2026-10-19
+date-format: "[NH TAC Meeting · ]MMMM D, YYYY"
+format:
+  revealjs:
+    output-file: index.html
+    theme: [default, styles/presentation-theme.scss]
+    slide-number: true
+    transition: fade
+    transition-speed: fast
+    width: 1920
+    height: 1080
+    margin: 0.06
+    center: false
+    hash: true
+    history: true
+    controls: true
+    progress: true
+    html-math-method: mathml
+    fig-align: center
+    embed-resources: true
+    include-in-header:
+      - text: |
+          <link rel="preload" href="assets/fonts/NotoSansMath.woff2" as="font" type="font/woff2" crossorigin>
+          <style>
+            @font-face {
+              font-family: "Noto Sans Math";
+              src: url("assets/fonts/NotoSansMath.woff2") format("woff2");
+              font-display: swap;
+            }
+            .notation-key {
+              font-size: 0.66em;
+              line-height: 1.55;
+              color: var(--color-secondary, #5c5c58);
+              margin-top: 0.55em;
+              padding-top: 0.4em;
+              border-top: 1px solid var(--color-border, #d8d8d4);
+            }
+            .tac-tag {
+              display: inline-block;
+              font-size: 0.62em;
+              letter-spacing: 0.03em;
+              text-transform: uppercase;
+              color: #7a5c33;
+              border-left: 3px solid #E67E22;
+              padding-left: 0.5em;
+              margin-bottom: 0.35em;
+            }
+          </style>
+    include-after-body:
+      - text: |
+          <script src="styles/presentation-figure-modal.js"></script>
+execute:
+  echo: false
+  warning: false
+  message: false
+knitr:
+  opts_chunk:
+    dev: "svg"
+    fig.align: "center"
+---
+
+```{r setup}
+#| include: false
+
+source("R/00_helpers.R")
+suppressPackageStartupMessages({
+  library(data.table)
+  library(ggplot2)
+})
+
+S   <- readRDS("summary/nh_sgp_summary.rds")
+W   <- readRDS("summary/nh_wida_summary.rds")
+ov  <- as.data.table(S$overall)
+lev <- as.data.table(S$levels)
+sg  <- as.data.table(S$subgroups)
+sgp_pool <- as.data.table(S$subgroups_pooled)
+tg  <- as.data.table(S$targets)
+tgp <- as.data.table(S$targets_prior)
+prof <- as.data.table(S$proficiency)
+sgpd <- as.data.table(S$sgp_distribution)
+M   <- S$meta
+WM  <- W$meta
+BNY <- if (!is.null(M$baseline_norm_year)) M$baseline_norm_year else "2018_2019"
+BNYL <- pretty_year(BNY)
+
+AY  <- M$analysis_year
+AYL <- M$analysis_year_label
+if (is.null(M$data_received) || !nzchar(M$data_received)) {
+  M$data_received <- "July 9, 2026"
+}
+
+WAY <- WM$analysis_year
+WAYL <- WM$analysis_year_label
+
+COHORT_COL   <- "#3498DB"
+BASELINE_COL <- "#E67E22"
+LEVEL_COLS   <- c(Low = "#C0392B", Typical = "#95A5A6", High = "#27AE60")
+GRID_COL     <- "#D8D8D4"
+TEXT_COL     <- "#141410"
+WIDA_COL     <- "#8E44AD"
+
+theme_nh <- function(base_size = 22) {
+  theme_minimal(base_size = base_size, base_family = "Noto Sans") +
+    theme(
+      text            = element_text(color = TEXT_COL),
+      plot.title      = element_text(face = "bold", size = rel(1.05)),
+      plot.subtitle   = element_text(color = "#5c5c58"),
+      panel.grid.minor = element_blank(),
+      panel.grid.major = element_line(color = GRID_COL, linewidth = 0.4),
+      strip.text      = element_text(face = "bold"),
+      legend.position = "top",
+      legend.title    = element_blank(),
+      axis.title      = element_text(color = "#5c5c58")
+    )
+}
+
+mmn_cell <- function(content, grade_label, norm = c("cohort", "baseline"), year = AY) {
+  norm <- match.arg(norm)
+  r <- ov[CONTENT_AREA == content & GRADE_LABEL == grade_label & YEAR == year]
+  if (!nrow(r) || (norm == "cohort" && is.na(r$n_cohort))) return("&mdash;")
+  if (norm == "cohort") fmt_mmn(r$mean_cohort, r$median_cohort, r$n_cohort)
+  else fmt_mmn(r$mean_baseline, r$median_baseline, r$n_baseline)
+}
+
+wida_mmn <- function(grade_label, norm = c("cohort", "baseline")) {
+  norm <- match.arg(norm)
+  r <- as.data.table(W$sgp_overall)[GRADE_LABEL == grade_label]
+  if (!nrow(r)) return("&mdash;")
+  if (norm == "cohort") fmt_mmn(r$mean_cohort, r$median_cohort, r$n_cohort)
+  else fmt_mmn(r$mean_baseline, r$median_baseline, r$n_baseline)
+}
+
+fmt_mmsn <- function(mean_val, median_val, sd_val, n) {
+  if (length(n) && !is.na(n) && n < SMALL_N) return("&mdash;")
+  if (any(is.na(c(mean_val, median_val, sd_val, n)))) return("&mdash;")
+  paste0(formatC(round(mean_val, 1), format = "f", digits = 1), "/",
+         formatC(round(median_val, 0), format = "d"), "/",
+         formatC(round(sd_val, 1), format = "f", digits = 1), "/",
+         fmt_count(n))
+}
+
+get_val <- function(content, grade_label, col, year = AY) {
+  r <- ov[CONTENT_AREA == content & GRADE_LABEL == grade_label & YEAR == year]
+  if (!nrow(r)) return(NA_real_)
+  r[[col]]
+}
+
+gof_token <- function(content_area) {
+  data.table::fcase(
+    content_area == "READING",     "ELA",
+    content_area == "ELA",         "ELA",
+    content_area == "MATHEMATICS", "MATH",
+    default = content_area
+  )
+}
+
+gof_src <- function(content_area, grade, year, norm = "cohort") {
+  file.path("Figures", "gof",
+            sprintf("%s_%s_%s_g%s.svg", gof_token(content_area), year, norm, grade))
+}
+
+wida_gof_src <- function(grade, year = WAY, norm = "baseline") {
+  file.path("Figures", "gof", sprintf("wida_%s_%s_g%s.svg", year, norm, grade))
+}
+
+gof_figure <- function(content_area, grade, year, norm = "cohort",
+                       caption = NULL, alt = NULL, max_height = NULL,
+                       src = NULL) {
+  if (is.null(src)) src <- gof_src(content_area, grade, year, norm)
+  if (!file.exists(src)) {
+    return(sprintf('<div style="padding:1em;color:#c0392b;font-size:0.6em">missing: %s</div>', src))
+  }
+  if (is.null(caption)) caption <- sprintf("%s Grade %s &mdash; %s (%s)",
+                                           pretty_subject(content_area), pretty_grade(grade),
+                                           pretty_year(year), norm)
+  if (is.null(alt)) alt <- gsub("&mdash;", "-", caption)
+  img_style <- if (!is.null(max_height)) {
+    sprintf("max-height:%s;width:auto;max-width:100%%;display:block;margin:0 auto", max_height)
+  } else {
+    "width:100%;height:auto"
+  }
+  sprintf(
+    '<figure style="margin:0;text-align:center">
+       <img src="%s" alt="%s" style="%s"/>
+       <figcaption>%s</figcaption>
+     </figure>', src, alt, img_style, caption)
+}
+
+emit_html <- function(x) cat("\n```{=html}\n", x, "\n```\n", sep = "")
+
+gof_grid <- function(figs, min_col = "300px", gap = "0.6em", class = NULL) {
+  class_attr <- if (!is.null(class)) sprintf(' class="%s"', class) else ""
+  emit_html(sprintf(
+    '<div%s style="display:grid;grid-template-columns:repeat(auto-fit,minmax(%s,1fr));gap:%s;align-items:start">%s</div>',
+    class_attr, min_col, gap, paste(figs, collapse = "")))
+}
+
+table_css <- sprintf('
+<style>
+  table.results-table { border-collapse: collapse; width: 100%%; font-size: 0.72em; }
+  table.results-table th, table.results-table td { padding: 0.35em 0.6em; text-align: center; border-bottom: 1px solid var(--color-border); }
+  table.results-table thead .grp { font-family: "Josefin Sans", sans-serif; font-weight: 600; }
+  table.results-table thead .grp-ela  { color: %s; border-bottom: 2px solid %s; }
+  table.results-table thead .grp-math { color: %s; border-bottom: 2px solid %s; }
+  table.results-table .rt-grade { text-align: left; font-family: "Josefin Sans", sans-serif; }
+  table.results-table .rt-base { color: %s; }
+  table.results-table tbody tr:hover { background: var(--color-surface-subtle); }
+  table.results-table tr.dim-row th { text-align:left; background: var(--color-surface-subtle);
+    font-family:"Josefin Sans",sans-serif; color: var(--color-primary); padding-top:0.5em; }
+  .rt-caption { font-size: 0.55em; color: var(--color-secondary); font-style: italic; margin-top: 0.4em; }
+</style>', COHORT_COL, COHORT_COL, "#7a5c33", "#7a5c33", BASELINE_COL)
+```
+
+## AI Contribution &amp; Authorship Statement
+
+These analyses and this presentation represent the work of the author with substantive and continuous assistance from AI-based systems (Anthropic's Claude), integrated natively into the analysis, revision, and preparation of this deck.
+
+::: {.key-insight}
+**The use of AI here is not incidental or peripheral &mdash; it is essential, embedded, and reflective of a methodological shift toward AI-native scholarship. This statement is offered in the spirit of methodological clarity and epistemic honesty.**
+:::
+
+- **Verification of inputs:** Every figure and factual claim is generated from cached aggregates of the student-level files. Claims that cannot be verified from those files are deliberately **not asserted**.
+
+- **Computational modules:** AI contributed to the R summary pipeline, the `ggplot2` figures, and the verification of reported numbers against the analysis logs.
+
+- **Authorship &amp; responsibility:** The author retains full responsibility for all claims, analyses, and recommendations (ICMJE/AERA norms). AI is not listed as an author but its instrumental role is explicitly acknowledged.
+
+::: {.notes}
+Front-load the disclosure. The pipeline is what makes it checkable: every number regenerates from the cached summaries, so an AI-assisted analysis is auditable in a way a hand-built deck is not.
+:::
+
+
+## Roadmap {.center}
+
+::: {.visually-hidden}
+Roadmap for the talk
+:::
+
+::: {style="font-size: 1.05em;"}
+1. **What was run** &mdash; NH SAS cohort and baseline analyses
+2. **2026 results** &mdash; overall growth and model fit
+3. **Growth in context** &mdash; pandemic recovery and the 2018&ndash;19 baseline
+4. **Growth equity** &mdash; results by student group
+5. **Target attainment** &mdash; catch-up / keep-up
+6. **WIDA ACCESS** &mdash; growth to the Level 4.5 exit standard
+7. **Questions for the TAC**
+:::
+
+::: {.key-insight}
+**`r fmt_count(M$n_growth_cohort_total)`** students received a `r AYL` NH SAS growth percentile (grades 4&ndash;8, ELA and mathematics). **`r fmt_count(WM$n_growth_baseline_total)`** English learners received a `r WAYL` WIDA baseline growth percentile. NH SAS results use the student-level file received **`r M$data_received`**.
+:::
+
+::: {.notes}
+Two programmes in one meeting: NH SAS first, then WIDA ACCESS. The WIDA section is the one that will take the most discussion because of the ACCESS 3.0 scale transition.
+:::
+
+
+# SGP results for 2026 {.center}
+
+::: {.visually-hidden}
+Section one: 2026 NH SAS results
+:::
+
+
+## What was run: NH SAS (grades 4&ndash;8)
+
+Two SGP analyses were conducted on the `r AYL` NH SAS data (ELA and Mathematics, grades 3&ndash;8; growth from grade 4):
+
+- **Cohort-referenced** &mdash; growth norms built from the most recent cohorts; by construction these center mean/median SGP on **50**.
+- **Baseline-referenced** &mdash; historical coefficient matrices from the pre-pandemic **2018&ndash;19** administration (with 2017&ndash;18 priors). These are **not** centered on 50 and let us examine COVID-era academic recovery, changes in rates of learning, and possible **scale drift**.
+- **Projections** (lagged and straight, three-year catch-up / keep-up and move-up / stay-up) were calculated using both norm sets.
+
+Science and grade 11 are on the file but are **not** included in the SGP analyses.
+
+::: {.key-insight}
+Cohort norms answer *"how did this student grow relative to academic peers this year?"* Baseline norms answer *"how does that growth compare to pre-pandemic rates of learning?"*
+:::
+
+::: {.notes}
+Same 2018-19 baseline window New Hampshire has used since the skip-year 2020-21 analyses. Grade 3 has no prior, so no SGP. SCIENCE and grade 11 are INVALID_CASE in the prep scripts.
+:::
+
+
+## Provenance &amp; reproducibility {.smaller}
+
+::: {.columns}
+::: {.column width="56%"}
+- NH SAS analyses used student-level data supplied by the New Hampshire Department of Education, **received `r M$data_received`**.
+- WIDA ACCESS analyses used the ESOL extract for 2026 (with both the new and old composite scales).
+- Conducted with the **`SGP` R package** (version `r M$sgp_package_version`).
+- All analyses converged; goodness-of-fit plots confirm successful analyses.
+- Source code is public on GitHub:
+  - NH SAS: [github.com/CenterForAssessment/New_Hampshire](https://github.com/CenterForAssessment/New_Hampshire)
+  - WIDA ACCESS: [github.com/CenterForAssessment/WIDA_NH](https://github.com/CenterForAssessment/WIDA_NH)
+  - SGP package: [github.com/CenterForAssessment/SGP](https://github.com/CenterForAssessment/SGP)
+:::
+::: {.column width="42%"}
+::: {.key-insight-box}
+::: {.key-insight-box-title}
+Reproducible pipeline
+:::
+This deck is generated from cached summaries of the student-level LONG data. When NHDOE supplies revised data, re-running the pipeline refreshes **every** number and table automatically.
+:::
+:::
+:::
+
+::: {.notes}
+The NH SAS run completed 10 July 2026 (SGP 2.3.0.1); the WIDA run completed 22 June 2026. Both objects live on the Dropbox-symlinked Data directories of the analysis repos.
+:::
+
+
+## 2026 SGP results at a glance
+
+```{r results-table}
+#| output: asis
+
+grades <- as.character(4:8)
+rows <- vapply(grades, function(g) {
+  sprintf(
+    '<tr><th class="rt-grade">%s</th><td>%s</td><td class="rt-base">%s</td><td>%s</td><td class="rt-base">%s</td></tr>',
+    g,
+    mmn_cell("READING",     g, "cohort"),
+    mmn_cell("READING",     g, "baseline"),
+    mmn_cell("MATHEMATICS", g, "cohort"),
+    mmn_cell("MATHEMATICS", g, "baseline")
+  )
+}, character(1))
+
+emit_html(paste0(table_css, sprintf('
+<table class="results-table">
+  <thead>
+    <tr>
+      <th rowspan="2">Grade</th>
+      <th class="grp grp-ela" colspan="2">ELA</th>
+      <th class="grp grp-math" colspan="2">Mathematics</th>
+    </tr>
+    <tr>
+      <th>Cohort</th><th class="rt-base">Baseline</th>
+      <th>Cohort</th><th class="rt-base">Baseline</th>
+    </tr>
+  </thead>
+  <tbody>%s</tbody>
+</table>
+<div class="rt-caption">Each cell: mean&#8202;/&#8202;median&#8202;/&#8202;N of student growth percentiles, %s. Cohort norms center on 50 by construction; baseline norms are referenced to 2018&ndash;19 rates of learning. Data received %s.</div>
+', paste(rows, collapse = "\n"), AYL, M$data_received)))
+```
+
+::: {.notes}
+Walk the cohort columns first (all ~50), then the baseline columns. The deviations from 50 are the story.
+:::
+
+
+## Reading the 2026 baseline results
+
+```{r baseline-narrative}
+#| output: asis
+
+by <- ov[YEAR == AY & !is.na(n_baseline) & n_baseline > 0]
+by[, dev := mean_baseline - 50]
+flag <- by[!is.na(dev) & abs(dev) >= 2][order(-abs(dev))]
+
+mk <- function(x) sprintf("%s Grade %s (mean <strong>%.1f</strong>)",
+                          x$SUBJECT, x$GRADE_LABEL, x$mean_baseline)
+li <- function(dt) {
+  if (!nrow(dt)) return("<li>None materially different</li>")
+  paste0("<li>", vapply(seq_len(nrow(dt)), function(i) mk(dt[i]), character(1)), "</li>", collapse = "")
+}
+above <- flag[dev > 0]; below <- flag[dev < 0]
+
+emit_html(sprintf('
+<div style="display:flex;gap:2em;align-items:flex-start">
+  <div style="flex:1">
+    <p style="font-weight:600;color:#27ae60;margin-bottom:0.2em">Above pre-pandemic rates (baseline mean &gt; 52)</p>
+    <ul>%s</ul>
+  </div>
+  <div style="flex:1">
+    <p style="font-weight:600;color:#c0392b;margin-bottom:0.2em">Below pre-pandemic rates (baseline mean &lt; 48)</p>
+    <ul>%s</ul>
+  </div>
+</div>', li(above), li(below)))
+```
+
+::: {.key-insight}
+Cohort-referenced results are, as expected, centered on 50 with even conditional coverage. The **baseline** results are the diagnostic lens &mdash; they say whether `r AYL` growth matches the 2018&ndash;19 rate of learning.
+:::
+
+::: {.notes}
+Generated from the cache, so the flagged grades update automatically. Keep interpretation cautious here; the trend slide does the interpreting.
+:::
+
+
+## Growth distribution: Low / Typical / High
+
+```{r level-distribution}
+#| fig-width: 16
+#| fig-height: 6.2
+
+ld <- lev[YEAR == AY & !is.na(LEVEL) & GRADE_LABEL %in% as.character(4:8)]
+ld[, GRADE_LABEL := factor(GRADE_LABEL, levels = as.character(4:8))]
+ld[, NORM := factor(NORM, levels = c("Cohort", "Baseline"))]
+
+ggplot(ld, aes(x = GRADE_LABEL, y = pct, fill = LEVEL)) +
+  geom_col(width = 0.78) +
+  geom_hline(yintercept = c(33.3, 66.7), color = "white", linewidth = 0.5, linetype = "22") +
+  facet_grid(SUBJECT ~ NORM) +
+  scale_fill_manual(values = LEVEL_COLS) +
+  scale_y_continuous(labels = function(x) paste0(x, "%"), expand = expansion(mult = c(0, 0.02))) +
+  labs(x = NULL, y = NULL,
+       title = paste0("Share of students at each growth level, ", AYL),
+       subtitle = "Cohort norms split roughly one-third each; baseline shifts reveal recovery / drift") +
+  theme_nh(20)
+```
+
+::: {.notes}
+Cohort panels should show the classic ~1/3 Low, Typical, High. Where baseline panels tilt toward Low or High is where pre-pandemic-referenced growth diverges.
+:::
+
+
+# Model fit and conditional coverage {.center}
+
+::: {.visually-hidden}
+Section two: model fit
+:::
+
+
+## What these plots do and do not diagnose
+
+Each plot shows, for every decile of prior achievement, the share of students falling in each growth-percentile decile. Two different things move those cells, and only one of them is a fitting problem.
+
+::: {.columns}
+::: {.column width="48%"}
+**What they diagnose**
+
+*Systematic tilt across prior achievement.* If growth percentiles drift upward or downward as prior achievement rises, the conditional model is not covering the range of prior achievement evenly. That is misfit, and it is actionable.
+:::
+::: {.column width="48%"}
+**What they cannot diagnose**
+
+*Departure from exact uniformity.* Scores are discrete. Students sharing a prior and a current score must receive the same growth percentile, so the conditional distribution cannot be uniform and the cells cannot all sit at 10%. That lumpiness follows from fitting a continuous quantile model to a discrete scale.
+:::
+:::
+
+::: {.key-insight}
+The diagnostic content is the **tilt**, not the distance from 10%. For baseline norms a level shift is neither misfit nor uniformity: it is the change in the prior-to-current relationship that the comparison exists to detect.
+:::
+
+::: {.notes}
+Same framing as the Rhode Island TAC deck. What remains diagnostic is conditional tilt.
+:::
+
+
+## NH SAS ELA &mdash; cohort model fit, `r AYL`
+
+```{r gof-ela-cohort}
+#| output: asis
+gof_grid(vapply(c("4","5","6","7","8"),
+                function(g) gof_figure("READING", g, AY, "cohort",
+                                       caption = sprintf("ELA Grade %s", g)),
+                character(1)))
+```
+
+::: {.notes}
+Uniform bands across prior achievement = good fit. Click any panel to enlarge.
+:::
+
+
+## NH SAS Mathematics &mdash; cohort model fit, `r AYL`
+
+```{r gof-math-cohort}
+#| output: asis
+gof_grid(vapply(c("4","5","6","7","8"),
+                function(g) gof_figure("MATHEMATICS", g, AY, "cohort",
+                                       caption = sprintf("Mathematics Grade %s", g)),
+                character(1)))
+```
+
+
+## Cohort vs. baseline fit &mdash; ELA Grade 7
+
+```{r gof-contrast}
+#| output: asis
+gof_grid(c(
+  gof_figure("READING", "7", AY, "cohort",
+             caption = "ELA Grade 7 &mdash; Cohort norms", max_height = "63vh"),
+  gof_figure("READING", "7", AY, "baseline",
+             caption = "ELA Grade 7 &mdash; Baseline norms", max_height = "63vh")
+), min_col = "380px", class = "gof-grid-compact")
+```
+
+::: {.notes}
+Same grade, two norm sets. A level shift on the baseline panel is the recovery / drift signal, not misfit.
+:::
+
+
+# Growth in context {.center}
+
+::: {.visually-hidden}
+Section three: pandemic context
+:::
+
+
+## Where were they during the pandemic?
+
+The `r AYL` tested grades sat in very different places when schooling was disrupted. There is no `2019_2020` NH SAS administration.
+
+```{r pandemic-table}
+#| output: asis
+
+rows <- c(
+  '<tr><th class="rt-grade">Grade 8</th><td>Grade 2</td><td>Grade 3</td></tr>',
+  '<tr><th class="rt-grade">Grade 7</th><td>Grade 1</td><td>Grade 2</td></tr>',
+  '<tr><th class="rt-grade">Grade 6</th><td>Kindergarten</td><td>Grade 1</td></tr>',
+  '<tr><th class="rt-grade">Grade 5</th><td>Pre-K</td><td>Kindergarten</td></tr>',
+  '<tr><th class="rt-grade">Grade 4</th><td>Not yet in school</td><td>Pre-K</td></tr>'
+)
+emit_html(paste0(table_css, sprintf('
+<table class="results-table" style="font-size:0.7em;max-width:75%%;margin:0 auto">
+  <thead><tr><th>Grade in %s</th><th>Spring 2020</th><th>2020&ndash;21 (first post-COVID test)</th></tr></thead>
+  <tbody>%s</tbody>
+</table>
+<div class="rt-caption">Grade 8 in %s spent early-elementary years in disrupted schooling; grade 4 had not yet entered the tested progression.</div>',
+AYL, paste(rows, collapse = ""), AYL)))
+```
+
+::: {.notes}
+The point is only to locate the 2026 grades in the pandemic, not to claim a causal reading of any one cell.
+:::
+
+
+## Trend: same grade over time (baseline SGP)
+
+```{r baseline-trend}
+#| fig-width: 16
+#| fig-height: 6.0
+
+tr <- ov[GRADE_LABEL %in% as.character(4:8) &
+         YEAR %in% c("2021_2022","2022_2023","2023_2024","2024_2025","2025_2026") &
+         !is.na(mean_baseline)]
+tr[, GRADE_LABEL := factor(paste("Grade", GRADE_LABEL), levels = paste("Grade", 4:8))]
+tr[, YEAR_LABEL := factor(YEAR_LABEL, levels = as.character(2022:2026))]
+
+ggplot(tr, aes(x = YEAR_LABEL, y = mean_baseline, color = SUBJECT, group = SUBJECT)) +
+  geom_hline(yintercept = 50, color = "#9a9a94", linetype = "22") +
+  geom_line(linewidth = 1.05) +
+  geom_point(size = 2.8) +
+  facet_wrap(~ GRADE_LABEL, nrow = 1) +
+  scale_color_manual(values = c(ELA = COHORT_COL, Mathematics = "#7a5c33")) +
+  labs(x = NULL, y = "Mean baseline SGP",
+       title = "Same-grade baseline-referenced growth, 2022–2026",
+       subtitle = "Dashed line = the 2018–19 rate of learning. A return toward 50 is recovery completing, not a new decline.") +
+  theme_nh(18)
+```
+
+::: {.notes}
+Read each panel as a fixed grade across years, not a cohort aging. Mathematics returning toward 50 is the fading of rebound growth; a line that stays below 50 is the genuine concern.
+:::
+
+
+## ELA Grade 7 over time &mdash; goodness of fit
+
+```{r gof-drift-ela7}
+#| output: asis
+gof_grid(vapply(c("2022_2023","2023_2024","2024_2025","2025_2026"),
+                function(y) gof_figure("READING", "7", y, "baseline",
+                                       caption = sprintf("ELA Grade 7 &mdash; %s", pretty_year(y))),
+                character(1)), min_col = "300px")
+```
+
+::: {.notes}
+Same grade, four administrations, baseline norms. Consistent shape = the quantile regression still fits; a level shift is a change in the rate of learning.
+:::
+
+
+# Growth equity {.center}
+
+::: {.visually-hidden}
+Section four: growth by student group
+:::
+
+
+## Growth by student group (NH SAS, `r AYL`)
+
+```{r equity-table}
+#| output: asis
+
+dims <- c("English Learner", "Students w/ Disability", "Economically Disadv.")
+sp <- sgp_pool[DIMENSION %in% dims]
+
+cell <- function(subj, grp, col) {
+  r <- sp[SUBJECT == subj & GROUP == grp]
+  if (!nrow(r)) return("&mdash;")
+  fmt_mmsn(r[[paste0("mean_", col)]], r[[paste0("median_", col)]],
+           r[[paste0("sd_", col)]], r[[paste0("n_", col)]])
+}
+
+body <- ""
+for (d in dims) {
+  grps <- sp[DIMENSION == d, unique(GROUP)]
+  body <- paste0(body, sprintf('<tr class="dim-row"><th colspan="5">%s</th></tr>', d))
+  for (grp in grps) {
+    body <- paste0(body, sprintf(
+      '<tr><th class="rt-grade">%s</th><td>%s</td><td class="rt-base">%s</td><td>%s</td><td class="rt-base">%s</td></tr>',
+      grp, cell("ELA", grp, "cohort"), cell("ELA", grp, "baseline"),
+      cell("Mathematics", grp, "cohort"), cell("Mathematics", grp, "baseline")))
+  }
+}
+
+emit_html(paste0(table_css, sprintf('
+<table class="results-table" style="font-size:0.62em">
+  <thead>
+    <tr><th rowspan="2">Group</th>
+        <th class="grp grp-ela" colspan="2">ELA</th>
+        <th class="grp grp-math" colspan="2">Mathematics</th></tr>
+    <tr><th>Cohort</th><th class="rt-base">Baseline</th><th>Cohort</th><th class="rt-base">Baseline</th></tr>
+  </thead>
+  <tbody>%s</tbody>
+</table>
+<div class="rt-caption">mean&#8202;/&#8202;median&#8202;/&#8202;SD&#8202;/&#8202;N, NH SAS grades 4&ndash;8 pooled, %s. Cells with N &lt; 10 are suppressed.</div>', body, AYL)))
+```
+
+::: {.notes}
+SDs travel with the means. If every group sits near the same SD, the equity story is entirely in central tendency.
+:::
+
+
+## Growth by gender and race/ethnicity (NH SAS, `r AYL`)
+
+```{r equity-table-demo}
+#| output: asis
+
+dims <- c("Gender", "Race/Ethnicity")
+sp <- sgp_pool[DIMENSION %in% dims]
+
+cell <- function(subj, grp, col) {
+  r <- sp[SUBJECT == subj & GROUP == grp]
+  if (!nrow(r)) return("&mdash;")
+  fmt_mmsn(r[[paste0("mean_", col)]], r[[paste0("median_", col)]],
+           r[[paste0("sd_", col)]], r[[paste0("n_", col)]])
+}
+
+body <- ""
+for (d in dims) {
+  grps <- sp[DIMENSION == d, unique(GROUP)]
+  body <- paste0(body, sprintf('<tr class="dim-row"><th colspan="5">%s</th></tr>', d))
+  for (grp in grps) {
+    body <- paste0(body, sprintf(
+      '<tr><th class="rt-grade">%s</th><td>%s</td><td class="rt-base">%s</td><td>%s</td><td class="rt-base">%s</td></tr>',
+      grp, cell("ELA", grp, "cohort"), cell("ELA", grp, "baseline"),
+      cell("Mathematics", grp, "cohort"), cell("Mathematics", grp, "baseline")))
+  }
+}
+
+emit_html(paste0(table_css, sprintf('
+<table class="results-table" style="font-size:0.56em">
+  <thead>
+    <tr><th rowspan="2">Group</th>
+        <th class="grp grp-ela" colspan="2">ELA</th>
+        <th class="grp grp-math" colspan="2">Mathematics</th></tr>
+    <tr><th>Cohort</th><th class="rt-base">Baseline</th><th>Cohort</th><th class="rt-base">Baseline</th></tr>
+  </thead>
+  <tbody>%s</tbody>
+</table>
+<div class="rt-caption">mean&#8202;/&#8202;median&#8202;/&#8202;SD&#8202;/&#8202;N, NH SAS grades 4&ndash;8 pooled, %s. Native Hawaiian or Pacific Islander and American Indian or Alaska Native have small N; cells with N &lt; 10 are suppressed.</div>', body, AYL)))
+```
+
+::: {.notes}
+White is the majority group. Hispanic or Latino is the largest minoritized group. The two smallest race groups have N in the low tens to nineties — read those cells cautiously.
+:::
+
+
+## Equity gaps at a glance
+
+```{r equity-plot}
+#| fig-width: 16
+#| fig-height: 6.0
+
+dims <- c("English Learner", "Students w/ Disability", "Economically Disadv.")
+ep <- sgp_pool[DIMENSION %in% dims & !is.na(mean_cohort),
+               .(mean_sgp = weighted.mean(mean_cohort, n_cohort, na.rm = TRUE),
+                 mean_base = weighted.mean(mean_baseline, n_baseline, na.rm = TRUE)),
+               by = .(DIMENSION, GROUP)]
+epl <- melt(ep, id.vars = c("DIMENSION","GROUP"),
+            measure.vars = c("mean_sgp","mean_base"),
+            variable.name = "norm", value.name = "sgp")
+epl[, norm := factor(norm, labels = c("Cohort", "Baseline"))]
+
+ggplot(epl, aes(x = sgp, y = reorder(GROUP, sgp), fill = norm)) +
+  geom_col(position = position_dodge(width = 0.7), width = 0.65) +
+  geom_vline(xintercept = 50, color = "#9a9a94", linetype = "22") +
+  facet_wrap(~ DIMENSION, scales = "free_y", ncol = 1) +
+  scale_fill_manual(values = c(Cohort = COHORT_COL, Baseline = BASELINE_COL)) +
+  labs(x = "Mean SGP (ELA + Mathematics pooled)", y = NULL,
+       title = paste0("Growth by student group, ", AYL)) +
+  theme_nh(19)
+```
+
+::: {.notes}
+Dashed line is 50. Cohort bars near 50 = comparable current-year growth. Descriptive, not causal.
+:::
+
+
+## Within-year growth is close to comparable across groups
+
+```{r equity-comparable}
+#| output: asis
+
+pairs <- list(
+  c("Female", "Male"),
+  c("English Learners (EL)", "Non-English Learners (Non-EL)"),
+  c("Students with Disabilities (SWD)", "Students without Disabilities (Non-SWD)"),
+  c("Economically Disadvantaged", "Not Economically Disadvantaged")
+)
+labs_ <- c("Gender (Female vs Male)", "English learners", "Students with disabilities", "Economically disadvantaged")
+
+mk <- function(pr, lab) {
+  vals <- vapply(c("ELA", "Mathematics"), function(sj) {
+    a <- sgp_pool[SUBJECT == sj & GROUP == pr[1], mean_cohort]
+    b <- sgp_pool[SUBJECT == sj & GROUP == pr[2], mean_cohort]
+    if (!length(a) || !length(b) || is.na(a) || is.na(b)) return("&mdash;")
+    sprintf("%.1f vs %.1f", a, b)
+  }, character(1))
+  sprintf('<tr><th class="rt-grade">%s</th><td>%s</td><td>%s</td></tr>', lab, vals[1], vals[2])
+}
+
+emit_html(paste0(table_css, sprintf('
+<table class="results-table" style="font-size:0.68em;max-width:70%%;margin:0 auto">
+  <thead><tr><th>Group vs. comparison group</th><th>ELA</th><th>Mathematics</th></tr></thead>
+  <tbody>%s</tbody>
+</table>
+<div class="rt-caption">Mean cohort-referenced SGP, NH SAS grades 4&ndash;8 pooled, %s.</div>',
+paste(vapply(seq_along(pairs), function(i) mk(pairs[[i]], labs_[i]), character(1)), collapse = ""), AYL)))
+```
+
+::: {.key-insight}
+Where achievement gaps are large, **within-year growth is often not**. Cohort SGPs near 50 for both members of a pair mean the gap is being maintained rather than widened this year.
+:::
+
+::: {.notes}
+Descriptive. Name the pair that is not close, if any, as the priority.
+:::
+
+
+# Target attainment {.center}
+
+::: {.visually-hidden}
+Section five: catch-up / keep-up
+:::
+
+
+## What the target actually is
+
+"Catch up" and "keep up" mean nothing without a stated horizon. In New Hampshire the NH SAS target is proficiency **by the end of the grades 3&ndash;8 progression**, so the horizon shrinks as students approach grade 8.
+
+```{r targets-horizon}
+#| output: asis
+
+hz <- tg[METRIC == "Catch Up / Keep Up" & NORM == "Cohort",
+         .(n = sum(n, na.rm = TRUE), attained = sum(attained, na.rm = TRUE),
+           yrs = suppressWarnings(max(years_to_target, na.rm = TRUE))),
+         by = .(GRADE_LABEL, aspiration)]
+hz[, rate := 100 * attained / n]
+
+grades_h <- as.character(4:8)
+rows_h <- vapply(grades_h, function(gl) {
+  cu <- hz[GRADE_LABEL == gl & aspiration == "Catch Up"]
+  ku <- hz[GRADE_LABEL == gl & aspiration == "Keep Up"]
+  sprintf('<tr><th class="rt-grade">Grade %s</th><td><strong>%s</strong></td><td>%s</td><td>%s</td></tr>',
+          gl,
+          if (nrow(cu) && is.finite(cu$yrs)) ifelse(cu$yrs == 0, "same year",
+            sprintf("%d year%s", as.integer(cu$yrs), ifelse(cu$yrs == 1, "", "s"))) else "&mdash;",
+          if (nrow(cu) && !is.na(cu$rate)) sprintf("%.1f%%", cu$rate) else "&mdash;",
+          if (nrow(ku) && !is.na(ku$rate)) sprintf("%.1f%%", ku$rate) else "&mdash;")
+}, character(1))
+
+emit_html(paste0(table_css, sprintf('
+<table class="results-table" style="font-size:0.66em;max-width:70%%;margin:0 auto">
+  <thead><tr><th>Grade</th><th>Horizon to target</th><th>Catch-up rate</th><th>Keep-up rate</th></tr></thead>
+  <tbody>%s</tbody>
+</table>
+<div class="rt-caption">Cohort targets, NH SAS, ELA and mathematics pooled, %s. Horizon is the median number of years to the target.</div>',
+paste(rows_h, collapse = ""), AYL)))
+```
+
+::: {.key-insight}
+As the horizon shrinks, catch-up rates fall and keep-up rates rise. Most of the apparent grade gradient is the **target**, not the students.
+:::
+
+::: {.notes}
+Grade 8 "catch up" collapses into "is proficient now." Grade-to-grade comparisons are not meaningful unless the horizon travels with them.
+:::
+
+
+## Catch-up / keep-up attainment (NH SAS, `r AYL`)
+
+```{r targets-plot}
+#| fig-width: 16
+#| fig-height: 5.9
+
+ct <- tg[METRIC == "Catch Up / Keep Up" & NORM == "Cohort" & !is.na(rate)]
+ct[, GRADE_LABEL := factor(GRADE_LABEL, levels = as.character(4:8))]
+ct[, aspiration := factor(aspiration, levels = c("Catch Up", "Keep Up"))]
+ct[, xlab := paste0(GRADE_LABEL, "\n(", ifelse(is.na(years_to_target) | years_to_target == 0, "same yr",
+                    paste0(years_to_target, " yr")), ")")]
+ct <- ct[order(GRADE_LABEL)]
+ct[, xlab := factor(xlab, levels = unique(xlab))]
+
+ggplot(ct, aes(x = xlab, y = rate, fill = aspiration)) +
+  geom_col(position = position_dodge(width = 0.75), width = 0.68) +
+  geom_errorbar(aes(ymin = rate_lo, ymax = rate_hi),
+                position = position_dodge(width = 0.75), width = 0.16,
+                linewidth = 0.5, color = "#141410") +
+  geom_text(aes(label = fmt_count(n), y = 3),
+            position = position_dodge(width = 0.75), size = 3.6, color = "white") +
+  facet_wrap(~ SUBJECT) +
+  scale_fill_manual(values = c("Catch Up" = "#8E44AD", "Keep Up" = COHORT_COL)) +
+  scale_y_continuous(labels = function(x) paste0(x, "%"),
+                     limits = c(0, 100), expand = expansion(mult = c(0, 0.02))) +
+  labs(x = "Grade (horizon to target)", y = "% attaining target",
+       title = "Share of students on track to catch up / keep up",
+       subtitle = "Catch Up = students below proficient; Keep Up = students at/above.\nBars show 95% Wilson intervals; N is printed in each bar.") +
+  theme_nh(19)
+```
+
+::: {.notes}
+Read across grades only with the horizon in view. Intervals are here so the rates are falsifiable.
+:::
+
+
+## Target attainment by prior achievement
+
+```{r targets-prior}
+#| output: asis
+
+th <- tgp[NORM == "Cohort" & !is.na(rate)]
+low  <- th[ACHIEVEMENT_LEVEL_PRIOR %in% c("Below Proficient") & aspiration == "Catch Up"]
+high <- th[ACHIEVEMENT_LEVEL_PRIOR %in% c("Above Proficient") & aspiration == "Keep Up"]
+
+low_rate  <- if (nrow(low))  weighted.mean(low$rate,  low$n)  else NA_real_
+high_rate <- if (nrow(high)) weighted.mean(high$rate, high$n) else NA_real_
+low_n  <- if (nrow(low))  sum(low$n)  else 0
+high_n <- if (nrow(high)) sum(high$n) else 0
+
+emit_html(sprintf('
+<div style="display:flex;gap:2em;justify-content:center;margin-top:0.5em">
+  <div class="stat-callout"><div class="stat-number">%s</div>
+    <div class="stat-label">of students who were <strong>Below Proficient</strong> last year<br/>are on track to <strong>catch up</strong><br/>
+      <span style="font-size:0.82em;opacity:0.75">N = %s</span></div></div>
+  <div class="stat-callout"><div class="stat-number">%s</div>
+    <div class="stat-label">of students who were <strong>Above Proficient</strong> last year<br/>are on track to <strong>keep up</strong><br/>
+      <span style="font-size:0.82em;opacity:0.75">N = %s</span></div></div>
+</div>
+<div class="rt-caption" style="text-align:center">These are different students judged against different targets, so the two figures are not a gap. NH SAS, ELA and mathematics pooled, %s.</div>',
+fmt_pct(low_rate), fmt_count(low_n), fmt_pct(high_rate), fmt_count(high_n), AYL))
+```
+
+::: {.key-insight}
+Students entering below proficient face the steepest catch-up targets and attain them least often &mdash; the central equity concern for accountability use of these growth results.
+:::
+
+::: {.notes}
+Say the caveat out loud: these two percentages describe different students measured against different targets.
+:::
+
+
+# WIDA ACCESS for New Hampshire {.center}
+
+::: {.visually-hidden}
+Section six: WIDA ACCESS
+:::
+
+
+## What was run: WIDA ACCESS
+
+English learners in New Hampshire take ACCESS for ELLs. The SGP analyses treat the Overall ELP composite as `READING` and ask whether students are **on track to the state's exit standard**.
+
+- **Exit / proficiency criterion:** **WIDA Level 4.5** (in `SGPstateData` and in the prep scripts since 2019). Fine-grained scores 4.5&ndash;4.9 are collapsed to Level 4.5.
+- **Cohort SGPs** for 2026 were computed on the **new ACCESS 3.0 scale**.
+- **Baseline SGPs and baseline catch-up / keep-up targets** were computed on the **old ACCESS 2.0 scale**, against the existing 4.5 cuts. Those are the headline on-track results in this section.
+- Targets run 1 to 6 years forward. The rates below use the **6-year** horizon &mdash; the longest window present in the object.
+
+::: {.warning-box}
+::: {.warning-box-title}
+2026 is a transition year
+:::
+`WIDA_NH` does not yet carry the consortium's 2026 transition metadata (new cuts, knots, linkages). Cohort targets computed on the new scale against old-scale cuts are not on the same footing as the baseline targets. They are shown only as a discussion item.
+:::
+
+::: {.notes}
+Be explicit: 4.5, not 4.7. New Mexico uses 4.7; New Hampshire does not. The 2026 script swapped SCALE_SCORE and SCALE_SCORE_OLD_SCALE so baseline ran on the old scale, then swapped back.
+:::
+
+
+## ACCESS participation by grade, `r WAYL`
+
+```{r wida-participation}
+#| output: asis
+
+pt <- as.data.table(W$participation)[YEAR == WAY]
+pt <- pt[order(as.numeric(GRADE))]
+rows <- vapply(seq_len(nrow(pt)), function(i) {
+  r <- pt[i]
+  sprintf('<tr><th class="rt-grade">%s</th><td>%s</td><td>%s</td><td>%s</td></tr>',
+          r$GRADE_LABEL, fmt_count(r$n_tested),
+          fmt_count(r$n_growth_cohort), fmt_count(r$n_growth_baseline))
+}, character(1))
+
+emit_html(paste0(table_css, sprintf('
+<table class="results-table" style="font-size:0.62em;max-width:70%%;margin:0 auto">
+  <thead><tr><th>Grade</th><th>N tested</th><th>N with cohort SGP</th><th class="rt-base">N with baseline SGP</th></tr></thead>
+  <tbody>%s</tbody>
+</table>
+<div class="rt-caption">WIDA ACCESS Overall ELP, %s. Kindergarten is shown as K. Cells with N &lt; 10 are suppressed later in the on-track tables, not here.</div>',
+paste(rows, collapse = ""), WAYL)))
+```
+
+::: {.notes}
+Kindergarten has no prior, so no SGP. Upper-grade cells are smaller; that is why the on-track tables suppress N < 10.
+:::
+
+
+## Percent at or above Level 4.5 over time
+
+```{r wida-proficiency}
+#| fig-width: 16
+#| fig-height: 6.0
+
+ex <- as.data.table(W$levels_at_exit)[!is.na(pct_proficient)]
+ex[, GRADE_F := factor(GRADE_LABEL, levels = c("K", as.character(1:12)))]
+ex[, YEAR_F := factor(YEAR_LABEL, levels = sort(unique(YEAR_LABEL)))]
+
+ggplot(ex[GRADE_LABEL %in% c("K", as.character(1:12))],
+       aes(x = YEAR_F, y = pct_proficient, group = 1)) +
+  geom_line(color = WIDA_COL, linewidth = 0.8) +
+  geom_point(color = WIDA_COL, size = 1.6) +
+  facet_wrap(~ GRADE_F, nrow = 2) +
+  scale_y_continuous(labels = function(x) paste0(x, "%"), limits = c(0, NA)) +
+  labs(x = NULL, y = "% at or above WIDA Level 4.5",
+       title = "Share of tested students at the New Hampshire exit standard",
+       subtitle = "Reported achievement level. 2026 levels are the vendor-reported ACCESS 3.0 classifications.") +
+  theme_nh(16) + theme(axis.text.x = element_text(size = rel(0.7), angle = 45, hjust = 1))
+```
+
+::: {.notes}
+2026 points sit on a new scale. Do not read a 2025-to-2026 jump as a change in English proficiency without the next slide.
+:::
+
+
+## 2026 WIDA SGP at a glance
+
+```{r wida-sgp-table}
+#| output: asis
+
+wo <- as.data.table(W$sgp_overall)
+wo <- wo[order(as.numeric(GRADE))]
+rows <- vapply(seq_len(nrow(wo)), function(i) {
+  r <- wo[i]
+  sprintf('<tr><th class="rt-grade">%s</th><td>%s</td><td class="rt-base">%s</td></tr>',
+          r$GRADE_LABEL,
+          fmt_mmn(r$mean_cohort, r$median_cohort, r$n_cohort),
+          fmt_mmn(r$mean_baseline, r$median_baseline, r$n_baseline))
+}, character(1))
+
+emit_html(paste0(table_css, sprintf('
+<table class="results-table" style="font-size:0.62em;max-width:60%%;margin:0 auto">
+  <thead><tr><th>Grade</th><th>Cohort (new scale)</th><th class="rt-base">Baseline (old scale)</th></tr></thead>
+  <tbody>%s</tbody>
+</table>
+<div class="rt-caption">mean&#8202;/&#8202;median&#8202;/&#8202;N, WIDA ACCESS Overall ELP, %s. Baseline cells are the headline growth results for this transition year. Cells with N &lt; 10 are suppressed.</div>',
+paste(rows, collapse = ""), WAYL)))
+```
+
+::: {.notes}
+Cohort column is on the new scale; baseline column is on the old scale. They are not interchangeable.
+:::
+
+
+## Baseline SGP trend, WIDA ACCESS
+
+```{r wida-sgp-trend}
+#| fig-width: 16
+#| fig-height: 6.0
+
+wt <- as.data.table(W$sgp_trend)[!is.na(mean_baseline) & GRADE_LABEL %in% as.character(1:8)]
+wt[, GRADE_F := factor(paste("Grade", GRADE_LABEL), levels = paste("Grade", 1:8))]
+wt[, YEAR_F := factor(YEAR_LABEL, levels = sort(unique(YEAR_LABEL)))]
+
+ggplot(wt, aes(x = YEAR_F, y = mean_baseline, group = 1)) +
+  geom_hline(yintercept = 50, color = "#9a9a94", linetype = "22") +
+  geom_line(color = BASELINE_COL, linewidth = 1.0) +
+  geom_point(color = BASELINE_COL, size = 2.2) +
+  facet_wrap(~ GRADE_F, nrow = 2) +
+  labs(x = NULL, y = "Mean baseline SGP",
+       title = "WIDA ACCESS baseline-referenced growth, grades 1–8",
+       subtitle = "2026 points use the old composite scale. Dashed line = the historical ACCESS 2.0 rate of learning.") +
+  theme_nh(17) + theme(axis.text.x = element_text(size = rel(0.75), angle = 45, hjust = 1))
+```
+
+::: {.notes}
+Grades 1-8 keep the N large enough to read. 2026 is on the old scale by construction of the split run.
+:::
+
+
+## The 2026 scale transition
+
+```{r wida-scale}
+#| output: asis
+
+st <- as.data.table(W$scale_transition)
+st <- st[order(as.numeric(GRADE))]
+rows <- vapply(seq_len(nrow(st)), function(i) {
+  r <- st[i]
+  sprintf(
+    '<tr><th class="rt-grade">%s</th><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td></tr>',
+    r$GRADE_LABEL,
+    fmt_count(r$n),
+    if (is.na(r$cor_new_old)) "&mdash;" else sprintf("%.2f", r$cor_new_old),
+    if (is.na(r$mean_diff)) "&mdash;" else sprintf("%+.1f", r$mean_diff),
+    if (is.na(r$pct_proficient_reported)) "&mdash;" else sprintf("%.1f%%", r$pct_proficient_reported),
+    if (is.na(r$pct_proficient_old_cuts)) "&mdash;" else sprintf("%.1f%%", r$pct_proficient_old_cuts)
+  )
+}, character(1))
+
+emit_html(paste0(table_css, sprintf('
+<table class="results-table" style="font-size:0.58em">
+  <thead>
+    <tr>
+      <th>Grade</th><th>N</th><th>r (new, old)</th><th>Mean (new &minus; old)</th>
+      <th>%% at/above 4.5<br/>(reported, new scale)</th>
+      <th>%% at/above 4.5<br/>(old scale, 4.5 cuts)</th>
+    </tr>
+  </thead>
+  <tbody>%s</tbody>
+</table>
+<div class="rt-caption">Old-scale percent proficient reapplies the current WIDA_NH Level 4.5 cuts to SCALE_SCORE_OLD_SCALE. The two percent-proficient columns are not interchangeable.</div>',
+paste(rows, collapse = ""))))
+```
+
+::: {.key-insight}
+The 2026 file carries both composites for every tested student. That is what makes an old-scale baseline analysis possible in the transition year, and what makes a silent mix of the two scales a mistake.
+:::
+
+::: {.notes}
+If the two percent-proficient columns diverge, that is the transition, not a change in the students.
+:::
+
+
+## On track to Level 4.5 by grade (baseline, 6-year)
+
+```{r wida-ontrack-plot}
+#| fig-width: 16
+#| fig-height: 6.0
+
+ot <- as.data.table(W$on_track_grade)[!is.na(rate)]
+ot[, GRADE_LABEL := factor(GRADE_LABEL, levels = c("K", as.character(1:12)))]
+ot[, aspiration := factor(aspiration, levels = c("Catch Up", "Keep Up"))]
+
+ggplot(ot, aes(x = GRADE_LABEL, y = rate, fill = aspiration)) +
+  geom_col(position = position_dodge(width = 0.75), width = 0.68) +
+  geom_errorbar(aes(ymin = rate_lo, ymax = rate_hi),
+                position = position_dodge(width = 0.75), width = 0.16,
+                linewidth = 0.5, color = "#141410") +
+  scale_fill_manual(values = c("Catch Up" = WIDA_COL, "Keep Up" = COHORT_COL)) +
+  scale_y_continuous(labels = function(x) paste0(x, "%"),
+                     limits = c(0, 100), expand = expansion(mult = c(0, 0.02))) +
+  labs(x = "Grade", y = "% of students below 4.5 who are on track",
+       title = paste0("Catch-up to WIDA Level 4.5, baseline norms, ", WAYL),
+       subtitle = "Students currently below Level 4.5, 6-year horizon, old composite scale.\nStudents already at or above 4.5 are on the next slide. Bars show 95% Wilson intervals.") +
+  theme_nh(19)
+```
+
+::: {.notes}
+Headline on-track slide. Baseline, old scale, 4.5, six-year horizon.
+:::
+
+
+## On track by current WIDA level
+
+```{r wida-ontrack-level}
+#| output: asis
+
+ol <- as.data.table(W$on_track_level)[!is.na(rate) & aspiration == "Catch Up"]
+ol[, ACHIEVEMENT_LEVEL := factor(as.character(ACHIEVEMENT_LEVEL), levels = WIDA_LEVELS)]
+setorder(ol, ACHIEVEMENT_LEVEL)
+
+rows <- ""
+for (lv in WIDA_LEVELS) {
+  cu <- ol[ACHIEVEMENT_LEVEL == lv]
+  if (!nrow(cu)) next
+  rows <- paste0(rows, sprintf(
+    '<tr><th class="rt-grade">%s</th><td>%s</td><td>%s</td></tr>',
+    pretty_wida_level(lv),
+    fmt_pct(cu$rate, 1),
+    fmt_count(cu$n)
+  ))
+}
+
+emit_html(paste0(table_css, sprintf('
+<table class="results-table" style="font-size:0.64em;max-width:62%%;margin:0 auto">
+  <thead><tr><th>Current level</th><th>Catch-up rate</th><th>N</th></tr></thead>
+  <tbody>%s</tbody>
+</table>
+<div class="rt-caption">Baseline 6-year catch-up, old scale, %s. The 6-year CUKU column codes students who started the window below 4.5; students already at the exit standard do not receive a 6-year Keep Up status. Cells with N &lt; 10 are suppressed.</div>',
+rows, WAYL)))
+```
+
+::: {.notes}
+Students currently at Level 4 are nearest the 4.5 exit; students at Level 1 face the longest catch-up. A student now at 4.5+ with a Catch Up status reached the exit during the window.
+:::
+
+
+## Years to the Level 4.5 target
+
+```{r wida-ytt}
+#| fig-width: 16
+#| fig-height: 5.8
+
+yt <- as.data.table(W$years_to_target)[!is.na(pct) & GRADE_LABEL %in% as.character(1:8)]
+yt[, GRADE_F := factor(paste("Grade", GRADE_LABEL), levels = paste("Grade", 1:8))]
+
+ggplot(yt, aes(x = factor(years), y = pct)) +
+  geom_col(fill = WIDA_COL, width = 0.75) +
+  facet_wrap(~ GRADE_F, nrow = 2) +
+  scale_y_continuous(labels = function(x) paste0(x, "%"),
+                     expand = expansion(mult = c(0, 0.05))) +
+  labs(x = "Years to Level 4.5 (baseline, 6-year configuration)",
+       y = NULL,
+       title = "Distribution of years-to-target, grades 1–8",
+       subtitle = paste0("From ", WM$cuku_baseline_column, " / ", WM$cuku_horizon,
+                         "-year configuration. Zero = already at or above the exit standard.")) +
+  theme_nh(17)
+```
+
+::: {.notes}
+Zero years = already proficient. A pile-up at 6 years means the 6-year window is still not enough for those students.
+:::
+
+
+## Cohort vs. baseline on-track &mdash; a discussion item
+
+```{r wida-compare}
+#| output: asis
+
+oc <- as.data.table(W$on_track_compare)[!is.na(rate) & aspiration == "Catch Up"]
+oc[, GRADE_LABEL := factor(GRADE_LABEL, levels = c("K", as.character(1:12)))]
+grades <- levels(oc$GRADE_LABEL)
+grades <- grades[grades %in% oc$GRADE_LABEL]
+
+rows <- vapply(grades, function(gl) {
+  b <- oc[GRADE_LABEL == gl & NORM == "Baseline"]
+  c <- oc[GRADE_LABEL == gl & NORM == "Cohort"]
+  sprintf('<tr><th class="rt-grade">%s</th><td class="rt-base">%s</td><td>%s</td></tr>',
+          gl,
+          if (nrow(b)) sprintf("%.1f%% (N = %s)", b$rate, fmt_count(b$n)) else "&mdash;",
+          if (nrow(c)) sprintf("%.1f%% (N = %s)", c$rate, fmt_count(c$n)) else "&mdash;")
+}, character(1))
+
+emit_html(paste0(table_css, sprintf('
+<div class="warning-box" style="margin-bottom:0.8em">
+  <div class="warning-box-title">Do not treat these two columns as a trend</div>
+  Baseline catch-up uses the old scale and the current 4.5 cuts. Cohort catch-up uses the new scale against those same old cuts. The difference is a scale-transition artefact until WIDA_NH carries 2026 transition metadata.
+</div>
+<table class="results-table" style="font-size:0.6em;max-width:70%%;margin:0 auto">
+  <thead><tr><th>Grade</th><th class="rt-base">Baseline catch-up (old scale)</th><th>Cohort catch-up (new scale)</th></tr></thead>
+  <tbody>%s</tbody>
+</table>
+<div class="rt-caption">Catch Up only, 6-year horizon, %s. Keep-up rates omitted here so the contrast is readable.</div>',
+paste(rows, collapse = ""), WAYL)))
+```
+
+::: {.notes}
+This is the TAC discussion item. Recommend reporting baseline on-track only for 2026, and deciding whether WIDA_NH should adopt the consortium 2026 cuts/knots/linkages now or wait for the new standards.
+:::
+
+
+## WIDA ACCESS &mdash; baseline model fit, `r WAYL`
+
+```{r wida-gof}
+#| output: asis
+gof_grid(vapply(c("3","4","5","6","7","8"),
+                function(g) gof_figure("READING", g, WAY, "baseline",
+                  caption = sprintf("Grade %s", g),
+                  src = wida_gof_src(g, WAY, "baseline")),
+                character(1)))
+```
+
+::: {.notes}
+Selected grades with adequate N. Click to enlarge. Kindergarten has no prior.
+:::
+
+
+## Summary {.smaller}
+
+- **NH SAS cohort SGPs** show even conditional coverage across grades 4&ndash;8 in ELA and mathematics &mdash; suitable for accountability calculations.
+- **NH SAS baseline SGPs** are the diagnostic lens on recovery relative to 2018&ndash;19. Grades flagged more than two points from 50 are listed on the baseline-results slide.
+- **Within-year growth is close to comparable across student groups**; where it is not, that pair is the priority.
+- **Catch-up / keep-up rates are not comparable across grades** without their target horizon, which shrinks toward grade 8.
+- **WIDA ACCESS exit remains WIDA Level 4.5.** Headline on-track results are **baseline-referenced and computed on the old composite scale**.
+- **2026 is an ACCESS 3.0 transition year.** Cohort targets on the new scale against old cuts should not be reported as a trend. Whether `WIDA_NH` adopts the consortium's 2026 transition metadata is a TAC question.
+
+::: {.notes}
+Land the two programmes separately. The WIDA transition is the one that needs a decision.
+:::
+
+
+## Questions for the TAC {.smaller}
+
+::: {.key-insight-box}
+::: {.key-insight-box-title}
+Where the committee's guidance is needed
+:::
+1. **How long should New Hampshire carry the old-scale WIDA baseline** after ACCESS 3.0? The 2026 split run is possible only because both composites are on the file.
+2. **Should `WIDA_NH` adopt the consortium 2026 transition metadata now** (cuts, knots, linkages already on the generic `WIDA` entry), or wait until new standards are set?
+3. **Should 2026 cohort on-track results be withheld** from public reporting, the way a contradicted baseline series would be, until the new-scale cuts exist?
+4. **Should the 2018&ndash;19 NH SAS baseline continue** as the monitoring series, or is it time to discuss a dual track &mdash; a fixed recovery series plus a re-established reporting norm?
+:::
+
+::: {.notes}
+Leave this up and open the floor. Questions 1-3 are WIDA; question 4 is NH SAS. This deck takes a position on 2026 WIDA reporting (baseline / old scale / 4.5) and asks the committee to confirm it.
+:::
+
+
+## Thank you {.center}
+
+::: {style="text-align: center; padding-top: 1em;"}
+::: {.conference-badge}
+New Hampshire Technical Advisory Committee
+:::
+
+**New Hampshire 2026 SGP Results**
+
+::: {style="font-size: 0.7em; color: #7c7c7c;"}
+Damian W. Betebenner &middot; National Center for the Improvement of Educational Assessment
+:::
+:::
+
+::: {.notes}
+Offer to circulate the deck and the pipeline. Further feedback rebuilds the deck from the analysis rather than rewriting it.
+:::
