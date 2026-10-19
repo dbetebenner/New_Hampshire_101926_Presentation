@@ -108,6 +108,9 @@ year counts, and unique levels only — never student rows.
 | `sgp_trend` | Mean baseline SGP by year and grade |
 | `scale_transition` | 2026 new-vs-old correlation and mean difference, consortium NEW_to_OLD linkage residual, the 4.5 cut on each scale (new = smallest new score linked to the old cut), % ≥ 4.5 on the old composite and on the new composite at the matched cut, and the invalid old-cuts-on-new-scores rate |
 | `level_crosstab` | Reported level × old-scale level |
+| `concordance_curves` | Consortium NEW_to_OLD concordance on a 100–600 grid, one curve per grade cluster (grades sharing a table are grouped automatically); no student data |
+| `cut45_curves` | 4.5 cut by grade: old, concordance-matched new, isotonic and concave-monotone smoothed new (what-if for standard setting; after `SGP_Sandbox/WIDA_SCALE_SCORE_TRANSITION_2026`) |
+| `cut45_whatif` | % of 2026 students ≥ 4.5 on the new composite under the matched, isotonic and concave-monotone cuts, and % whose classification changes |
 | `on_track_grade` / `on_track_level` | Baseline 6-year catch-up rates with Wilson intervals (the 6-year CUKU column codes students who started below 4.5; Keep Up is not present) |
 | `years_to_target` | Distribution of years to Level 4.5 |
 | `on_track_compare` | Cohort vs baseline catch-up/keep-up (discussion item) |

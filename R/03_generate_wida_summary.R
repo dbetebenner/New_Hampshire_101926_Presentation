@@ -182,6 +182,83 @@ if ("SCALE_SCORE_OLD_SCALE" %in% names(gy)) {
 }
 
 ## ---------------------------------------------------------------------------
+## transition anatomy (2026 only): concordance clusters, 4.5 cut articulation,
+## and a what-if of the 4.5 cut after monotone smoothing across grades.
+## Mirrors SGP_Sandbox/WIDA_SCALE_SCORE_TRANSITION_2026, re-expressed for the
+## NH 4.5 exit cut instead of WIDA's whole levels.
+## ---------------------------------------------------------------------------
+
+concordance_curves <- data.table()
+cut45_curves       <- data.table()
+cut45_whatif       <- data.table()
+
+if (exists("st") && exists("widaACCESS_2026_scale_score_transformation")) {
+  new_grid <- 100:600
+  grade_set <- as.character(0:12)
+  linked_by_grade <- lapply(grade_set, function(g)
+    widaACCESS_2026_scale_score_transformation(
+      grade = rep(g, length(new_grid)), scale_score = new_grid, direction = "NEW_to_OLD"))
+  names(linked_by_grade) <- grade_set
+
+  ## Grades whose NEW_to_OLD maps are identical share one concordance table.
+  sig <- vapply(linked_by_grade, function(v) paste(round(v, 3), collapse = ","), character(1))
+  cluster_id <- match(sig, unique(sig))
+  clusters <- data.table(GRADE = grade_set, CLUSTER_ID = cluster_id)
+  clusters[, CLUSTER := {
+    lab <- pretty_grade(GRADE)
+    if (.N == 1L) lab else paste0(lab[1], "\u2013", lab[.N])
+  }, by = CLUSTER_ID]
+
+  concordance_curves <- rbindlist(lapply(unique(cluster_id), function(k) {
+    g <- grade_set[cluster_id == k][1]
+    data.table(CLUSTER_ID = k, NEW = new_grid, OLD = linked_by_grade[[g]])
+  }))
+  concordance_curves <- merge(concordance_curves,
+                              unique(clusters[, .(CLUSTER_ID, CLUSTER)]),
+                              by = "CLUSTER_ID")
+
+  smooth_isotonic <- function(y) stats::isoreg(y)$yf
+  ## Least-squares fit with non-negative, non-increasing grade-to-grade steps.
+  smooth_concave_monotone <- function(y, x) {
+    if (!requireNamespace("quadprog", quietly = TRUE)) return(rep(NA_real_, length(y)))
+    n <- length(y)
+    h <- diff(x)
+    cons <- list()
+    for (i in 1:(n - 1)) { a <- numeric(n); a[i] <- -1; a[i + 1] <- 1; cons[[length(cons) + 1]] <- a }
+    for (i in 1:(n - 2)) {
+      a <- numeric(n)
+      a[i] <- -1 / h[i]; a[i + 1] <- 1 / h[i] + 1 / h[i + 1]; a[i + 2] <- -1 / h[i + 1]
+      cons[[length(cons) + 1]] <- a
+    }
+    sol <- tryCatch(
+      quadprog::solve.QP(diag(2, n), 2 * y, do.call(cbind, cons), rep(0, length(cons))),
+      error = function(e) NULL)
+    if (is.null(sol)) rep(NA_real_, n) else sol$solution
+  }
+
+  cut45_curves <- merge(cut45, clusters, by = "GRADE")
+  setorder(cut45_curves, CLUSTER_ID)
+  cut45_curves <- cut45_curves[order(as.numeric(GRADE))]
+  cut45_curves[, CUT45_ISO := smooth_isotonic(CUT45_NEW)]
+  cut45_curves[, CUT45_CON := smooth_concave_monotone(CUT45_NEW, as.numeric(GRADE))]
+  cut45_curves[, GRADE_LABEL := pretty_grade(GRADE)]
+
+  wf <- merge(st[, .(GRADE, SCALE_SCORE)],
+              cut45_curves[, .(GRADE, CUT45_NEW, CUT45_ISO, CUT45_CON)], by = "GRADE")
+  cut45_whatif <- wf[, .(
+    n              = .N,
+    pct_matched    = 100 * mean(SCALE_SCORE >= CUT45_NEW),
+    pct_isotonic   = 100 * mean(SCALE_SCORE >= CUT45_ISO),
+    pct_concave    = 100 * mean(SCALE_SCORE >= CUT45_CON),
+    pct_change_iso = 100 * mean((SCALE_SCORE >= CUT45_ISO) != (SCALE_SCORE >= CUT45_NEW)),
+    pct_change_con = 100 * mean((SCALE_SCORE >= CUT45_CON) != (SCALE_SCORE >= CUT45_NEW))
+  ), by = GRADE]
+  cut45_whatif[, GRADE_LABEL := pretty_grade(GRADE)]
+  cut45_whatif <- cut45_whatif[order(as.numeric(GRADE))]
+  suppress_small(cut45_whatif, n_cols = "n")
+}
+
+## ---------------------------------------------------------------------------
 ## on_track (baseline, 6-year horizon) + compare
 ## ---------------------------------------------------------------------------
 
@@ -262,6 +339,9 @@ summary_list <- list(
   sgp_trend        = sgp_trend,
   scale_transition = scale_transition,
   level_crosstab   = level_crosstab,
+  concordance_curves = concordance_curves,
+  cut45_curves     = cut45_curves,
+  cut45_whatif     = cut45_whatif,
   on_track_grade   = on_track_grade,
   on_track_level   = on_track_level,
   years_to_target  = years_to_target,

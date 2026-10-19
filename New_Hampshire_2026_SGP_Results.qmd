@@ -1068,6 +1068,169 @@ The vendor sent SCALE_SCORE_OLD_SCALE as the concordance of the new score, which
 :::
 
 
+## One concordance per ACCESS grade cluster
+
+```{r wida-concordance}
+#| fig-width: 16
+#| fig-height: 6.4
+
+cc <- as.data.table(W$concordance_curves)
+clus_levels <- unique(cc[order(CLUSTER_ID)]$CLUSTER)
+cc[, CLUSTER := factor(CLUSTER, levels = clus_levels)]
+clus_cols <- setNames(c("#7F8C8D", "#2980B9", WIDA_COL, BASELINE_COL, "#27AE60", "#C0392B"),
+                      clus_levels)
+
+ggplot(cc, aes(x = NEW, y = OLD, colour = CLUSTER)) +
+  geom_abline(slope = 1, intercept = 0, colour = "#9a9a94", linetype = "22") +
+  geom_line(linewidth = 1.1) +
+  scale_colour_manual(values = clus_cols) +
+  scale_x_continuous(limits = c(100, 600), breaks = seq(100, 600, 100)) +
+  scale_y_continuous(limits = c(100, 500), breaks = seq(100, 500, 100)) +
+  labs(x = "New composite (ACCESS 3.0)", y = "Linked old composite (ACCESS 2.0)", colour = "Grade cluster",
+       title = "The consortium 2026 concordance has one table per grade cluster",
+       subtitle = "Each line gives the old score a new score links to. Dashed line = identity.\nFlat runs are floors and ceilings, where many new scores share one old score.") +
+  theme_nh(19) + theme(legend.title = element_text(color = "#5c5c58"))
+```
+
+::: {.notes}
+Grades K, 1, 2-3, 4-5, 6-8 and 9-12 each have their own table, and grades in a cluster share one. The same old score links to different new scores in different clusters. Kindergarten tops out at an old score of 333, so Level 6 does not exist for K on the linked scale. Very few New Hampshire students sit on a floor or ceiling, so the flat runs do not drive the results.
+:::
+
+
+## The 4.5 exit cut on each scale
+
+```{r wida-cut-articulation}
+#| fig-width: 16
+#| fig-height: 5.6
+
+cv <- as.data.table(W$cut45_curves)
+cv[, G := as.numeric(GRADE)]
+cl <- cv[, .(xmin = min(G) - 0.5, xmax = max(G) + 0.5), by = .(CLUSTER_ID, CLUSTER)]
+cl[, shade := CLUSTER_ID %% 2 == 0]
+cl[, xmid := (xmin + xmax) / 2]
+cut_long <- rbind(
+  cv[, .(G, CUT = CUT45_OLD, SCALE = "Old scale (WIDA_NH 4.5 cut)")],
+  cv[, .(G, CUT = CUT45_NEW, SCALE = "New scale (concordance-matched 4.5 cut)")]
+)
+cut_long[, SCALE := factor(SCALE, levels = c("Old scale (WIDA_NH 4.5 cut)",
+                                             "New scale (concordance-matched 4.5 cut)"))]
+y_top <- max(cut_long$CUT, na.rm = TRUE) + 18
+
+dips <- cv[order(G)][, .(G, CUT45_NEW, prev = shift(CUT45_NEW))][!is.na(prev) & CUT45_NEW < prev]
+
+ggplot(cut_long, aes(x = G, y = CUT, colour = SCALE)) +
+  geom_rect(data = cl[shade == TRUE], inherit.aes = FALSE,
+            aes(xmin = xmin, xmax = xmax, ymin = -Inf, ymax = Inf),
+            fill = "#EFEFEA", colour = NA) +
+  geom_text(data = cl, inherit.aes = FALSE, aes(x = xmid, y = y_top, label = CLUSTER),
+            colour = "#5c5c58", size = 5.5) +
+  geom_line(linewidth = 1.1) +
+  geom_point(size = 2.6) +
+  geom_point(data = dips, inherit.aes = FALSE, aes(x = G, y = CUT45_NEW),
+             shape = 21, size = 7, stroke = 1.2, colour = "#9b3d3d", fill = NA) +
+  scale_colour_manual(values = c("Old scale (WIDA_NH 4.5 cut)" = "#5c5c58",
+                                 "New scale (concordance-matched 4.5 cut)" = WIDA_COL)) +
+  scale_x_continuous(breaks = 0:12, labels = c("K", 1:12)) +
+  labs(x = "Grade", y = "Scale score at Level 4.5",
+       title = "The old 4.5 cuts rise every grade; their new-scale images do not",
+       subtitle = "Shaded bands mark the concordance grade clusters. Circled: a new cut below the grade before it.") +
+  theme_nh(19)
+```
+
+```{r wida-g4-history}
+#| output: asis
+lx <- as.data.table(W$levels_at_exit)[GRADE %in% as.character(1:8) & YEAR < WAY & !is.na(pct_proficient)]
+top_g4 <- lx[, .(top = GRADE[which.max(pct_proficient)]), by = YEAR][, sum(top == "4")]
+n_yrs  <- uniqueN(lx$YEAR)
+r3 <- range(lx[GRADE == "3"]$pct_proficient)
+r4 <- range(lx[GRADE == "4"]$pct_proficient)
+yr_span <- paste(pretty_year(min(lx$YEAR)), "to", pretty_year(max(lx$YEAR)))
+emit_html(sprintf('<div class="key-insight">The grade 3&rarr;4 dip is not new. On the old scale, grade 4 had the highest share at or above 4.5 in %d of %d years from %s (%.0f&ndash;%.0f%%, against %.0f&ndash;%.0f%% in grade 3). On the new scale, that long-standing seam between the grade 2&ndash;3 and 4&ndash;5 concordance tables shows up as a cut that falls.</div>',
+  top_g4, n_yrs, yr_span, r4[1], r4[2], r3[1], r3[2]))
+```
+
+::: {.notes}
+WIDA built the concordance one grade cluster at a time, so each cluster carries over its own old relationship between scores and cuts. Within a cluster the new cuts rise with grade. Across a cluster boundary they can fall (grade 3 to 4) or jump (grade 5 to 6). If the new composite is meant to be a K-12 vertical scale, as ACCESS 2.0 was, cuts should not fall from one grade to the next. That is the seam WIDA's standard setting has to resolve.
+:::
+
+
+## What-if: standard setting smooths the new cuts
+
+:::: {.columns}
+
+::: {.column width="52%"}
+```{r wida-cut-smoothing}
+#| fig-width: 9
+#| fig-height: 7.2
+
+sm <- as.data.table(W$cut45_curves)
+sm[, G := as.numeric(GRADE)]
+sm_long <- rbind(
+  sm[, .(G, CUT = CUT45_NEW, METHOD = "Concordance-matched (interim)")],
+  sm[, .(G, CUT = CUT45_ISO, METHOD = "Isotonic (minimal fix)")],
+  sm[, .(G, CUT = CUT45_CON, METHOD = "Concave-monotone (smooth growth)")]
+)
+sm_long[, METHOD := factor(METHOD, levels = c("Concordance-matched (interim)",
+                                              "Isotonic (minimal fix)",
+                                              "Concave-monotone (smooth growth)"))]
+
+ggplot(sm_long[!is.na(CUT)], aes(x = G, y = CUT, colour = METHOD, linetype = METHOD)) +
+  geom_line(linewidth = 1.0) +
+  geom_point(size = 2.0) +
+  scale_colour_manual(values = c("Concordance-matched (interim)" = WIDA_COL,
+                                 "Isotonic (minimal fix)" = BASELINE_COL,
+                                 "Concave-monotone (smooth growth)" = COHORT_COL)) +
+  scale_linetype_manual(values = c("Concordance-matched (interim)" = "solid",
+                                   "Isotonic (minimal fix)" = "longdash",
+                                   "Concave-monotone (smooth growth)" = "solid")) +
+  scale_x_continuous(breaks = 0:12, labels = c("K", 1:12)) +
+  guides(colour = guide_legend(ncol = 1), linetype = guide_legend(ncol = 1)) +
+  labs(x = "Grade", y = "New-scale 4.5 cut",
+       title = "New-scale 4.5 cut under two smoothers") +
+  theme_nh(17)
+```
+:::
+
+::: {.column width="48%"}
+```{r wida-whatif-table}
+#| output: asis
+
+wf <- as.data.table(W$cut45_whatif)
+moved <- wf[(pct_change_iso > 0 | pct_change_con > 0) & !is.na(pct_matched)]
+still <- wf[!(GRADE %in% moved$GRADE)]$GRADE_LABEL
+fmt_pct <- function(x, ref) {
+  if (is.na(x)) return("<td>&mdash;</td>")
+  cls <- if (!is.na(ref) && abs(x - ref) >= 0.05) ' class="rt-warn"' else ""
+  sprintf('<td%s>%.1f%%</td>', cls, x)
+}
+rows <- vapply(seq_len(nrow(moved)), function(i) {
+  r <- moved[i]
+  sprintf('<tr><th class="rt-grade">%s</th><td>%s</td><td>%.1f%%</td>%s%s</tr>',
+          r$GRADE_LABEL, fmt_count(r$n), r$pct_matched,
+          fmt_pct(r$pct_isotonic, r$pct_matched), fmt_pct(r$pct_concave, r$pct_matched))
+}, character(1))
+
+emit_html(paste0(table_css, sprintf('
+<table class="results-table" style="font-size:0.6em">
+  <thead><tr><th>Grade</th><th>N</th><th>Interim</th><th>Isotonic</th><th>Concave</th></tr></thead>
+  <tbody>%s</tbody>
+</table>
+<div class="rt-caption">%% of 2026 students at or above 4.5 on the new composite under each set of cuts. Red cells move. Unchanged under both smoothers: grades %s. A what-if, not a prediction of WIDA&rsquo;s cuts.</div>',
+paste(rows, collapse = ""), paste(still, collapse = ", "))))
+```
+:::
+
+::::
+
+::: {.key-insight}
+Baseline growth and on-track results do not move: they use the old scale and the old 4.5 cuts. What moves is a 2026 exit decision made on the new composite, mostly in grades 3&ndash;5.
+:::
+
+::: {.notes}
+Re-expresses the SGP_Sandbox WIDA_SCALE_SCORE_TRANSITION_2026 analyses for the New Hampshire 4.5 cut. Isotonic only pools the grade 3 and 4 cuts, the smallest change that makes the cuts rise with grade. Concave-monotone also forces growth to slow with grade, which spreads the large K-to-1 step and moves grades 1-9; that is a strong assumption, so treat it as an upper bound. On WIDA's whole levels the sandbox found the same pattern: isotonic reclassifies about 12-13% of students in grades 3-4, concave-monotone up to 45% in grades 4-5.
+:::
+
+
 ## On track to Level 4.5 by grade (baseline, 6-year)
 
 ```{r wida-ontrack-plot}
@@ -1233,7 +1396,7 @@ Land the two programmes separately. The WIDA transition is the one that needs a 
 Where the committee's guidance is needed
 :::
 1. **How long should New Hampshire carry the old-scale WIDA baseline** after ACCESS 3.0? The 2026 split run is possible only because both composites are on the file.
-2. **Should `WIDA_NH` adopt the consortium 2026 transition metadata now** (cuts, knots, linkages already on the generic `WIDA` entry), or wait until new standards are set?
+2. **Should `WIDA_NH` adopt the consortium 2026 transition metadata now** (cuts, knots, linkages already on the generic `WIDA` entry), or wait until new standards are set? If those standards smooth the grade-cluster seams, grade 3&ndash;5 exit rates will move.
 3. **Should 2026 cohort on-track results be withheld** from public reporting, the way a contradicted baseline series would be, until the new-scale cuts exist?
 4. **Should the 2018&ndash;19 NH SAS baseline continue** as the monitoring series, or is it time to discuss a dual track &mdash; a fixed recovery series plus a re-established reporting norm?
 :::
