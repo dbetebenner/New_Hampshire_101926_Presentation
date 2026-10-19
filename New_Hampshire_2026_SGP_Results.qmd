@@ -628,7 +628,7 @@ emit_html(paste0(table_css, sprintf('
   </thead>
   <tbody>%s</tbody>
 </table>
-<div class="rt-caption">mean&#8202;/&#8202;median&#8202;/&#8202;SD&#8202;/&#8202;N, NH SAS grades 4&ndash;8 pooled, %s. Cells with N &lt; 10 are suppressed.</div>', body, AYL)))
+<div class="rt-caption">mean&#8202;/&#8202;median&#8202;/&#8202;SD&#8202;/&#8202;N, NH SAS grades 4&ndash;8 pooled, %s. Cells with N &lt; 10 are suppressed. For reference, SGPs uniformly distributed over the integers 1&ndash;99 have SD = &radic;((99&sup2; &minus; 1)&#8202;/&#8202;12) &asymp; 28.6.</div>', body, AYL)))
 ```
 
 ::: {.notes}
@@ -673,7 +673,7 @@ emit_html(paste0(table_css, sprintf('
   </thead>
   <tbody>%s</tbody>
 </table>
-<div class="rt-caption">mean&#8202;/&#8202;median&#8202;/&#8202;SD&#8202;/&#8202;N, NH SAS grades 4&ndash;8 pooled, %s. Native Hawaiian or Pacific Islander and American Indian or Alaska Native have small N; cells with N &lt; 10 are suppressed.</div>', body, AYL)))
+<div class="rt-caption">mean&#8202;/&#8202;median&#8202;/&#8202;SD&#8202;/&#8202;N, NH SAS grades 4&ndash;8 pooled, %s. Native Hawaiian or Pacific Islander and American Indian or Alaska Native have small N; cells with N &lt; 10 are suppressed. For reference, SGPs uniformly distributed over the integers 1&ndash;99 have SD = &radic;((99&sup2; &minus; 1)&#8202;/&#8202;12) &asymp; 28.6.</div>', body, AYL)))
 ```
 
 ::: {.notes}
