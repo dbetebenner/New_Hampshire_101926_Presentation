@@ -1,16 +1,32 @@
 /**
- * Park the QR on the title slide only. It must not be a sibling of the
- * other <section>s inside .slides — that extra child was shifting slide 2.
+ * Title-slide QR code. Lives on the .slides canvas (not inside a slide
+ * <section>) and is shown only while the title slide is current.
  */
 (function () {
   'use strict';
 
+  function onTitle() {
+    if (typeof Reveal !== 'undefined' && Reveal.getCurrentSlide) {
+      var slide = Reveal.getCurrentSlide();
+      if (slide) return slide.id === 'title-slide';
+    }
+    var hash = window.location.hash || '';
+    return hash === '' || hash === '#/' || hash.indexOf('#/title-slide') === 0;
+  }
+
   function placeQr() {
-    var slide = document.getElementById('title-slide');
+    var slides = document.querySelector('.reveal .slides');
     var qr = document.getElementById('deck-qr-src');
-    if (!slide || !qr) return;
+    if (!slides || !qr) return;
     qr.hidden = false;
-    slide.appendChild(qr);
+    slides.appendChild(qr);
+
+    var sync = function () { qr.classList.toggle('is-visible', onTitle()); };
+    sync();
+    if (typeof Reveal !== 'undefined' && Reveal.on) {
+      Reveal.on('ready', sync);
+      Reveal.on('slidechanged', sync);
+    }
   }
 
   if (document.readyState === 'loading') {
