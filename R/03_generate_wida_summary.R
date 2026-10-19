@@ -129,13 +129,31 @@ if ("SCALE_SCORE_OLD_SCALE" %in% names(gy)) {
     "WIDA_SCALE_XFORM",
     "/Users/conet/GitHub/DBetebenner/SGPstateData/master/Custom_Functions_Misc/WIDA/widaACCESS_2026_scale_score_transformation.R"
   )
+  ## The 4.5 exit cut is the 4th WIDA_NH cut. The new-scale cut a WIDA_NH
+  ## READING.2026 entry would carry is the smallest integer NEW score whose
+  ## NEW_to_OLD image reaches it; OLD_to_NEW can land on a half point where
+  ## two NEW scores share one OLD score.
+  cut45 <- data.table(
+    GRADE     = names(WIDA_NH_CUTS),
+    CUT45_OLD = vapply(WIDA_NH_CUTS, function(x) x[4], numeric(1))
+  )
   if (file.exists(xform_path)) {
     sys.source(xform_path, envir = environment())
     st[, SS_LINKED_OLD := widaACCESS_2026_scale_score_transformation(
       grade = GRADE, scale_score = SCALE_SCORE, direction = "NEW_to_OLD")]
+    new_grid <- 100:600
+    cut45[, CUT45_NEW := vapply(seq_len(.N), function(i) {
+      linked <- widaACCESS_2026_scale_score_transformation(
+        grade = rep(GRADE[i], length(new_grid)), scale_score = new_grid,
+        direction = "NEW_to_OLD")
+      hit <- new_grid[linked >= CUT45_OLD[i]]
+      if (length(hit)) as.numeric(min(hit)) else NA_real_
+    }, numeric(1))]
   } else {
     st[, SS_LINKED_OLD := NA_real_]
+    cut45[, CUT45_NEW := NA_real_]
   }
+  st <- merge(st, cut45, by = "GRADE", all.x = TRUE)
 
   scale_transition <- st[, .(
     n            = .N,
@@ -145,7 +163,10 @@ if ("SCALE_SCORE_OLD_SCALE" %in% names(gy)) {
     mean_diff    = mean(SCALE_SCORE - SCALE_SCORE_OLD_SCALE),
     mean_abs_link = mean(abs(SCALE_SCORE_OLD_SCALE - SS_LINKED_OLD), na.rm = TRUE),
     n_level_agree = sum(as.character(ACHIEVEMENT_LEVEL) == as.character(LEVEL_OLD), na.rm = TRUE),
+    cut45_old    = CUT45_OLD[1],
+    cut45_new    = CUT45_NEW[1],
     pct_proficient_old_composite = 100 * mean(LEVEL_OLD %in% WIDA_PROFICIENT_LEVELS, na.rm = TRUE),
+    pct_proficient_new_cut       = 100 * mean(SCALE_SCORE >= CUT45_NEW),
     pct_proficient_naive_new     = 100 * mean(LEVEL_NAIVE %in% WIDA_PROFICIENT_LEVELS, na.rm = TRUE)
   ), by = .(GRADE, GRADE_LABEL)]
   scale_transition <- scale_transition[order(as.numeric(GRADE))]

@@ -954,7 +954,7 @@ ggplot(ex[GRADE_LABEL %in% c("K", as.character(1:12))],
 ```
 
 ::: {.notes}
-2026 points sit on a new scale. Do not read a 2025-to-2026 jump as a change in English proficiency without the next slide.
+2026 levels come from the new composite, but WIDA's interim 2026 cuts are the concordance images of the old cuts, so the level series is linked across the transition. The link is only as good as the concordance, and WIDA has not yet set new standards. Treat a 2025-to-2026 jump with caution.
 :::
 
 
@@ -1022,15 +1022,18 @@ st <- as.data.table(W$scale_transition)
 st <- st[order(as.numeric(GRADE))]
 n_agree <- sum(st$n_level_agree, na.rm = TRUE)
 n_tot   <- sum(st$n, na.rm = TRUE)
+rates_match <- isTRUE(all.equal(st$pct_proficient_old_composite, st$pct_proficient_new_cut))
+max_link <- max(st$mean_abs_link, na.rm = TRUE)
 rows <- vapply(seq_len(nrow(st)), function(i) {
   r <- st[i]
   sprintf(
     '<tr><th class="rt-grade">%s</th><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td class="rt-warn">%s</td></tr>',
     r$GRADE_LABEL,
     fmt_count(r$n),
-    if (is.na(r$cor_new_old)) "&mdash;" else sprintf("%.2f", r$cor_new_old),
     if (is.na(r$mean_diff)) "&mdash;" else sprintf("%+.1f", r$mean_diff),
-    if (is.na(r$mean_abs_link)) "&mdash;" else sprintf("%.1f", r$mean_abs_link),
+    if (is.na(r$mean_abs_link)) "&mdash;" else sprintf("%.2f", r$mean_abs_link),
+    if (is.na(r$cut45_new)) sprintf("%.0f &rarr; &mdash;", r$cut45_old)
+      else sprintf("%.0f &rarr; %.0f", r$cut45_old, r$cut45_new),
     if (is.na(r$pct_proficient_old_composite)) "&mdash;" else sprintf("%.1f%%", r$pct_proficient_old_composite),
     if (is.na(r$pct_proficient_naive_new)) "&mdash;" else sprintf("%.1f%%", r$pct_proficient_naive_new)
   )
@@ -1040,25 +1043,28 @@ emit_html(paste0(table_css, sprintf('
 <table class="results-table" style="font-size:0.52em">
   <thead>
     <tr>
-      <th>Grade</th><th>N</th><th>r (new, old)</th>
+      <th>Grade</th><th>N</th>
       <th>Mean (new &minus; old)</th>
       <th>Mean |old &minus; linked(new)|</th>
-      <th>%% &ge; 4.5<br/>old composite</th>
-      <th class="rt-warn">%% &ge; 4.5<br/>old cuts on new scores</th>
+      <th>4.5 cut<br/>old &rarr; new</th>
+      <th>%% &ge; 4.5<br/>(matched cut)</th>
+      <th class="rt-warn">%% &ge; 4.5<br/>old cut on new score</th>
     </tr>
   </thead>
   <tbody>%s</tbody>
 </table>
-<div class="rt-caption">Both composites are scored 100&ndash;600; that is a shared range, not a shared scale. Vendor-reported 2026 levels match the current WIDA_NH 4.5 cuts on SCALE_SCORE_OLD_SCALE for %s of %s tested students &mdash; they are old-scale classifications, not a new-scale proficiency rate. The last column applies those same old cuts to the new composite and is not a valid result. Linked(new) uses the consortium NEW_to_OLD concordance on generic WIDA in SGPstateData; WIDA_NH does not yet carry that linkage.</div>',
-paste(rows, collapse = ""), fmt_count(n_agree), fmt_count(n_tot))))
+<div class="rt-caption">Both composites are scored 100&ndash;600; that is a shared range, not a shared scale. The vendor old-scale composite is the consortium NEW_to_OLD concordance of the new composite (largest grade mean gap %.2f points), not a separate measurement. The new-scale 4.5 cut is the smallest new score that the concordance links to the old cut. The matched-cut rate is %s on either scale and agrees with the vendor-reported level for %s of %s tested students. The last column applies old cuts to new scores and is not a valid result. The concordance is the one on generic WIDA in SGPstateData; WIDA_NH does not yet carry it.</div>',
+paste(rows, collapse = ""), max_link,
+if (rates_match) "identical" else "nearly identical",
+fmt_count(n_agree), fmt_count(n_tot))))
 ```
 
 ::: {.key-insight}
-Do not read mean (new &minus; old) as growth, and do not read the last column as a change in English proficiency. The 2026 file carries both composites so an old-scale baseline analysis is possible; mixing them is the mistake the last column illustrates.
+Levels carry across the transition; raw composites do not. WIDA&rsquo;s interim 2026 cuts are the concordance images of the old cuts, so a 2026 Level 4.5 means the same thing as a 2025 Level 4.5 to the extent the concordance holds. Mean (new &minus; old) is not growth, and the last column is the mistake to avoid.
 :::
 
 ::: {.notes}
-The two percent-proficient columns that used to sit side by side were identical because they were the same classification. ACCESS 3.0 reset the composite: the range is still 100-600, the scales are not comparable. The consortium linkage is already on generic WIDA; adopting it on WIDA_NH is the TAC question.
+The vendor sent SCALE_SCORE_OLD_SCALE as the concordance of the new score, which is why the linkage gap is zero and why levels agree for every student. So the old-scale baseline run uses linked scores, not a second test. The 4.5 cut column is what a WIDA_NH READING.2026 entry would carry. WIDA marks its 2026 cuts as interim until new standards are set; when they are, these classifications can change.
 :::
 
 
@@ -1175,7 +1181,7 @@ rows <- vapply(grades, function(gl) {
 emit_html(paste0(table_css, sprintf('
 <div class="warning-box" style="margin-bottom:0.8em">
   <div class="warning-box-title">Do not treat these two columns as a trend</div>
-  Baseline catch-up uses the old scale and the current 4.5 cuts. Cohort catch-up uses the new scale against those same old cuts. The difference is a scale-transition artefact until WIDA_NH carries 2026 transition metadata.
+  Baseline catch-up projects on the old scale and compares with the current 4.5 cuts. Cohort catch-up feeds each 2026 new-scale score into 2026 matrices whose prior-score slots were fit on old-scale scores, then compares the projections with the same old-scale cuts. The difference is a scale-transition artefact, not a finding.
 </div>
 <table class="results-table" style="font-size:0.6em;max-width:70%%;margin:0 auto">
   <thead><tr><th>Grade</th><th class="rt-base">Baseline catch-up (old scale)</th><th>Cohort catch-up (new scale)</th></tr></thead>
@@ -1186,7 +1192,7 @@ paste(rows, collapse = ""), WAYL)))
 ```
 
 ::: {.notes}
-This is the TAC discussion item. Recommend reporting baseline on-track only for 2026, and deciding whether WIDA_NH should adopt the consortium 2026 cuts/knots/linkages now or wait for the new standards.
+This is the TAC discussion item. Recommend reporting baseline on-track only for 2026. Adding READING.2026 cuts to WIDA_NH would fix the cut comparison but not the prior-slot mismatch in the 2026 cohort projections, so baseline stays the headline either way. The open question is whether WIDA_NH adopts the consortium 2026 cuts/knots/linkages now or waits for the new standards.
 :::
 
 
