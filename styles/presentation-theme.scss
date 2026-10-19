@@ -81,6 +81,7 @@ $presentation-heading-font-weight: 600;
 // ── Title slide ─────────────────────────────────────────────────
 #title-slide {
   position: relative;
+  height: 100%;
   text-align: center;
 
   h1.title {
@@ -112,32 +113,25 @@ $presentation-heading-font-weight: 600;
     color: var(--color-secondary);
     margin-top: 0.8em;
   }
-}
 
-// Pin to the 1920×1080 slides canvas so the code stays in the slide
-// corner (and scales with the deck) rather than the title text block.
-.reveal .slides > .deck-qr {
-  position: absolute;
-  right: 48px;
-  bottom: 48px;
-  width: 160px;
-  height: 160px;
-  margin: 0;
-  z-index: 30;
-  display: none;
-  line-height: 0;
-}
+  .deck-qr {
+    position: absolute;
+    right: 48px;
+    bottom: 48px;
+    width: 160px;
+    height: 160px;
+    margin: 0;
+    z-index: 2;
+    line-height: 0;
+  }
 
-.reveal .slides > .deck-qr.is-visible {
-  display: block;
-}
-
-.reveal .slides > .deck-qr img {
-  width: 100%;
-  height: 100%;
-  display: block;
-  background: #fff;
-  border-radius: 4px;
+  .deck-qr img {
+    width: 100%;
+    height: 100%;
+    display: block;
+    background: #fff;
+    border-radius: 4px;
+  }
 }
 
 // ── List styling ────────────────────────────────────────────────

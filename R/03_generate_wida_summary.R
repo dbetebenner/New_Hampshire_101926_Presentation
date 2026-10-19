@@ -122,14 +122,31 @@ level_crosstab <- data.table()
 if ("SCALE_SCORE_OLD_SCALE" %in% names(gy)) {
   st <- gy[!is.na(SCALE_SCORE) & !is.na(SCALE_SCORE_OLD_SCALE)]
   st[, LEVEL_OLD := wida_level_from_old_scale(SCALE_SCORE_OLD_SCALE, GRADE)]
+  ## Naive mix: current WIDA_NH 4.5 cuts applied to the NEW composite.
+  st[, LEVEL_NAIVE := wida_level_from_old_scale(SCALE_SCORE, GRADE)]
+
+  xform_path <- Sys.getenv(
+    "WIDA_SCALE_XFORM",
+    "/Users/conet/GitHub/DBetebenner/SGPstateData/master/Custom_Functions_Misc/WIDA/widaACCESS_2026_scale_score_transformation.R"
+  )
+  if (file.exists(xform_path)) {
+    sys.source(xform_path, envir = environment())
+    st[, SS_LINKED_OLD := widaACCESS_2026_scale_score_transformation(
+      grade = GRADE, scale_score = SCALE_SCORE, direction = "NEW_to_OLD")]
+  } else {
+    st[, SS_LINKED_OLD := NA_real_]
+  }
+
   scale_transition <- st[, .(
     n            = .N,
     cor_new_old  = stats::cor(SCALE_SCORE, SCALE_SCORE_OLD_SCALE),
     mean_new     = mean(SCALE_SCORE),
     mean_old     = mean(SCALE_SCORE_OLD_SCALE),
     mean_diff    = mean(SCALE_SCORE - SCALE_SCORE_OLD_SCALE),
-    pct_proficient_reported = 100 * mean(ACHIEVEMENT_LEVEL %in% WIDA_PROFICIENT_LEVELS, na.rm = TRUE),
-    pct_proficient_old_cuts = 100 * mean(LEVEL_OLD %in% WIDA_PROFICIENT_LEVELS, na.rm = TRUE)
+    mean_abs_link = mean(abs(SCALE_SCORE_OLD_SCALE - SS_LINKED_OLD), na.rm = TRUE),
+    n_level_agree = sum(as.character(ACHIEVEMENT_LEVEL) == as.character(LEVEL_OLD), na.rm = TRUE),
+    pct_proficient_old_composite = 100 * mean(LEVEL_OLD %in% WIDA_PROFICIENT_LEVELS, na.rm = TRUE),
+    pct_proficient_naive_new     = 100 * mean(LEVEL_NAIVE %in% WIDA_PROFICIENT_LEVELS, na.rm = TRUE)
   ), by = .(GRADE, GRADE_LABEL)]
   scale_transition <- scale_transition[order(as.numeric(GRADE))]
   suppress_small(scale_transition, n_cols = "n")

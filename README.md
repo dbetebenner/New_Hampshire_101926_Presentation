@@ -106,7 +106,7 @@ year counts, and unique levels only — never student rows.
 | `levels_dist` / `levels_at_exit` | Achievement-level distribution and percent at or above 4.5 |
 | `sgp_overall` | 2026 mean/median/N by grade (cohort and baseline) |
 | `sgp_trend` | Mean baseline SGP by year and grade |
-| `scale_transition` | 2026 new-vs-old correlation, mean difference, percent at/above 4.5 on each scale |
+| `scale_transition` | 2026 new-vs-old correlation, mean difference, consortium NEW_to_OLD linkage residual, old-composite % ≥ 4.5, and the invalid old-cuts-on-new-scores rate |
 | `level_crosstab` | Reported level × old-scale level |
 | `on_track_grade` / `on_track_level` | Baseline 6-year catch-up rates with Wilson intervals (the 6-year CUKU column codes students who started below 4.5; Keep Up is not present) |
 | `years_to_target` | Distribution of years to Level 4.5 |

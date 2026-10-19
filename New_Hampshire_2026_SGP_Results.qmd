@@ -216,6 +216,7 @@ table_css <- sprintf('
   table.results-table thead .grp-math { color: %s; border-bottom: 2px solid %s; }
   table.results-table .rt-grade { text-align: left; font-family: "Josefin Sans", sans-serif; }
   table.results-table .rt-base { color: %s; }
+  table.results-table .rt-warn { color: #9b3d3d; }
   table.results-table tbody tr:hover { background: var(--color-surface-subtle); }
   table.results-table tr.dim-row th { text-align:left; background: var(--color-surface-subtle);
     font-family:"Josefin Sans",sans-serif; color: var(--color-primary); padding-top:0.5em; }
@@ -1019,40 +1020,45 @@ Grades 1-8 keep the N large enough to read. 2026 is on the old scale by construc
 
 st <- as.data.table(W$scale_transition)
 st <- st[order(as.numeric(GRADE))]
+n_agree <- sum(st$n_level_agree, na.rm = TRUE)
+n_tot   <- sum(st$n, na.rm = TRUE)
 rows <- vapply(seq_len(nrow(st)), function(i) {
   r <- st[i]
   sprintf(
-    '<tr><th class="rt-grade">%s</th><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td></tr>',
+    '<tr><th class="rt-grade">%s</th><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td class="rt-warn">%s</td></tr>',
     r$GRADE_LABEL,
     fmt_count(r$n),
     if (is.na(r$cor_new_old)) "&mdash;" else sprintf("%.2f", r$cor_new_old),
     if (is.na(r$mean_diff)) "&mdash;" else sprintf("%+.1f", r$mean_diff),
-    if (is.na(r$pct_proficient_reported)) "&mdash;" else sprintf("%.1f%%", r$pct_proficient_reported),
-    if (is.na(r$pct_proficient_old_cuts)) "&mdash;" else sprintf("%.1f%%", r$pct_proficient_old_cuts)
+    if (is.na(r$mean_abs_link)) "&mdash;" else sprintf("%.1f", r$mean_abs_link),
+    if (is.na(r$pct_proficient_old_composite)) "&mdash;" else sprintf("%.1f%%", r$pct_proficient_old_composite),
+    if (is.na(r$pct_proficient_naive_new)) "&mdash;" else sprintf("%.1f%%", r$pct_proficient_naive_new)
   )
 }, character(1))
 
 emit_html(paste0(table_css, sprintf('
-<table class="results-table" style="font-size:0.58em">
+<table class="results-table" style="font-size:0.52em">
   <thead>
     <tr>
-      <th>Grade</th><th>N</th><th>r (new, old)</th><th>Mean (new &minus; old)</th>
-      <th>%% at/above 4.5<br/>(reported, new scale)</th>
-      <th>%% at/above 4.5<br/>(old scale, 4.5 cuts)</th>
+      <th>Grade</th><th>N</th><th>r (new, old)</th>
+      <th>Mean (new &minus; old)</th>
+      <th>Mean |old &minus; linked(new)|</th>
+      <th>%% &ge; 4.5<br/>old composite</th>
+      <th class="rt-warn">%% &ge; 4.5<br/>old cuts on new scores</th>
     </tr>
   </thead>
   <tbody>%s</tbody>
 </table>
-<div class="rt-caption">Old-scale percent proficient reapplies the current WIDA_NH Level 4.5 cuts to SCALE_SCORE_OLD_SCALE. The two percent-proficient columns are not interchangeable.</div>',
-paste(rows, collapse = ""))))
+<div class="rt-caption">Both composites are scored 100&ndash;600; that is a shared range, not a shared scale. Vendor-reported 2026 levels match the current WIDA_NH 4.5 cuts on SCALE_SCORE_OLD_SCALE for %s of %s tested students &mdash; they are old-scale classifications, not a new-scale proficiency rate. The last column applies those same old cuts to the new composite and is not a valid result. Linked(new) uses the consortium NEW_to_OLD concordance on generic WIDA in SGPstateData; WIDA_NH does not yet carry that linkage.</div>',
+paste(rows, collapse = ""), fmt_count(n_agree), fmt_count(n_tot))))
 ```
 
 ::: {.key-insight}
-The 2026 file carries both composites for every tested student. That is what makes an old-scale baseline analysis possible in the transition year, and what makes a silent mix of the two scales a mistake.
+Do not read mean (new &minus; old) as growth, and do not read the last column as a change in English proficiency. The 2026 file carries both composites so an old-scale baseline analysis is possible; mixing them is the mistake the last column illustrates.
 :::
 
 ::: {.notes}
-If the two percent-proficient columns diverge, that is the transition, not a change in the students.
+The two percent-proficient columns that used to sit side by side were identical because they were the same classification. ACCESS 3.0 reset the composite: the range is still 100-600, the scales are not comparable. The consortium linkage is already on generic WIDA; adopting it on WIDA_NH is the TAC question.
 :::
 
 
