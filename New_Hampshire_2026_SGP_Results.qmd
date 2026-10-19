@@ -54,6 +54,12 @@ format:
           </style>
     include-after-body:
       - text: |
+          <a id="deck-qr-src" class="deck-qr" hidden
+             href="https://dbetebenner.github.io/New_Hampshire_101926_Presentation/"
+             aria-label="Open this deck">
+            <img src="assets/qr-deck.svg" alt="QR code linking to this presentation">
+          </a>
+          <script src="styles/presentation-title-qr.js"></script>
           <script src="styles/presentation-figure-modal.js"></script>
 execute:
   echo: false
