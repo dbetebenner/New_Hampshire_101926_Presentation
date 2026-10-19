@@ -1,6 +1,6 @@
 ---
 title: "New Hampshire 2026 SGP Results"
-subtitle: "NH SAS (Grades 3–8) and WIDA ACCESS"
+subtitle: "NH SAS (Grades 3–8) and WIDA ACCESS (Grades K–12)"
 author:
   - name: "Damian W. Betebenner"
     affiliation: "National Center for the Improvement of Educational Assessment"
