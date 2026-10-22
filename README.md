@@ -129,7 +129,6 @@ Figures/gof/                         vendored goodness-of-fit SVGs + manifest.cs
 render.sh · Makefile                 pipeline orchestration
 docs/index.html                      rendered deck
 styles/                              reveal.js theme + figure lightbox
-assets/fonts/                        math font
 ```
 
 Student-level `.Rdata` / `.rda` / `.txt.zip` files are gitignored and must
