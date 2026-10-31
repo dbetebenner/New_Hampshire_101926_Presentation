@@ -1,5 +1,7 @@
 # New Hampshire 2026 SGP Analyses — NH TAC Presentation
 
+Part of Damian Betebenner's talks: <https://dbetebenner.github.io/talks/>
+
 A reveal.js (Quarto) presentation of New Hampshire's 2026 Student Growth
 Percentile (SGP) results — NH SAS (ELA/Mathematics, grades 4–8) and WIDA
 ACCESS (Overall ELP) — for the New Hampshire Technical Advisory Committee
@@ -32,8 +34,10 @@ Open **`docs/index.html`** in any browser (self-contained, works offline).
 - **`F`** — fullscreen · **`O`** — overview · arrows / space to advance
 - Click any goodness-of-fit plot to enlarge it.
 
-Leave GitHub Pages off (or the repository private) until NHDOE clears the
-results for release.
+**PDF of the slides:**
+<https://dbetebenner.github.io/New_Hampshire_101926_Presentation/New_Hampshire_2026_SGP_Results.pdf>
+(`docs/New_Hampshire_2026_SGP_Results.pdf`), printed from the published deck, so it
+matches the slides at the address above.
 
 ## The pipeline
 
