@@ -399,6 +399,7 @@ Generated from the cache, so the flagged grades update automatically. Keep inter
 ## Growth distribution: Low / Typical / High
 
 ```{r level-distribution}
+#| fig-alt: "Stacked bar chart of the share of students at low, typical and high growth by grade, in panels for each subject and for cohort and baseline norms. Dashed lines mark one-third and two-thirds; cohort norms split about evenly, while baseline norms shift with recovery or drift."
 #| fig-width: 16
 #| fig-height: 6.2
 
@@ -537,6 +538,7 @@ The point is only to locate the 2026 grades in the pandemic, not to claim a caus
 ## Trend: same grade over time (baseline SGP)
 
 ```{r baseline-trend}
+#| fig-alt: "Line chart of mean baseline SGP by year, 2022 to 2026, one panel per grade with a line for each subject. A dashed line at 50 marks the 2018–19 rate of learning."
 #| fig-width: 16
 #| fig-height: 6.0
 
@@ -678,6 +680,7 @@ White is the majority group. Hispanic or Latino is the largest minoritized group
 ## Equity gaps at a glance
 
 ```{r equity-plot}
+#| fig-alt: "Horizontal bar chart of mean SGP for each student group, ELA and mathematics pooled, with cohort and baseline bars side by side and one panel per demographic dimension. A dashed line marks 50."
 #| fig-width: 16
 #| fig-height: 6.0
 
@@ -800,6 +803,7 @@ Grade 8 "catch up" collapses into "is proficient now." Grade-to-grade comparison
 ## Catch-up / keep-up attainment (NH SAS, `r AYL`)
 
 ```{r targets-plot}
+#| fig-alt: "Bar chart of the percentage of students on track to catch up or keep up, by grade and horizon to target, one panel per subject. Bars show 95% intervals and the number of students."
 #| fig-width: 16
 #| fig-height: 5.9
 
@@ -928,6 +932,7 @@ Kindergarten has no prior, so no SGP. Upper-grade cells are smaller; that is why
 ## Percent at or above Level 4.5 over time
 
 ```{r wida-proficiency}
+#| fig-alt: "Line charts, one per grade from K to 12, of the percentage of tested students at or above WIDA Level 4.5 in each year."
 #| fig-width: 16
 #| fig-height: 6.0
 
@@ -984,6 +989,7 @@ Cohort column is on the new scale; baseline column is on the old scale. They are
 ## Baseline SGP trend, WIDA ACCESS
 
 ```{r wida-sgp-trend}
+#| fig-alt: "Line charts, one per grade from 1 to 8, of mean baseline SGP on WIDA ACCESS by year. A dashed line at 50 marks the historical ACCESS 2.0 rate of learning."
 #| fig-width: 16
 #| fig-height: 6.0
 
@@ -1065,6 +1071,7 @@ The vendor sent SCALE_SCORE_OLD_SCALE as the concordance of the new score, which
 ## One concordance per ACCESS grade cluster
 
 ```{r wida-concordance}
+#| fig-alt: "Line chart of the 2026 consortium concordance: for each grade cluster, the linked ACCESS 2.0 composite plotted against the new ACCESS 3.0 composite, with a dashed identity line. Flat runs mark floors and ceilings."
 #| fig-width: 16
 #| fig-height: 6.4
 
@@ -1094,6 +1101,7 @@ Grades K, 1, 2-3, 4-5, 6-8 and 9-12 each have their own table, and grades in a c
 ## The 4.5 exit cut on each scale
 
 ```{r wida-cut-articulation}
+#| fig-alt: "Line chart of the Level 4.5 exit cut by grade, K to 12, on the old scale and its image on the new scale. The old cuts rise every grade; the new-scale cuts do not, and circled points mark a new cut lower than the grade before. Shaded bands mark the concordance grade clusters."
 #| fig-width: 16
 #| fig-height: 5.6
 
@@ -1154,6 +1162,7 @@ WIDA built the concordance one grade cluster at a time, so each cluster carries 
 
 ::: {.column width="52%"}
 ```{r wida-cut-smoothing}
+#| fig-alt: "Line chart of the new-scale Level 4.5 cut by grade, K to 12, under two smoothing methods."
 #| fig-width: 9
 #| fig-height: 7.2
 
@@ -1228,6 +1237,7 @@ Re-expresses the SGP_Sandbox WIDA_SCALE_SCORE_TRANSITION_2026 analyses for the N
 ## On track to Level 4.5 by grade (baseline, 6-year)
 
 ```{r wida-ontrack-plot}
+#| fig-alt: "Bar chart, by grade, of the percentage of students below WIDA Level 4.5 who are on track to reach it within six years under baseline norms, with 95% intervals."
 #| fig-width: 16
 #| fig-height: 6.0
 
@@ -1292,6 +1302,7 @@ Students currently at Level 4 are nearest the 4.5 exit; students at Level 1 face
 ## Years to the Level 4.5 target
 
 ```{r wida-ytt}
+#| fig-alt: "Bar charts, one per grade from 1 to 8, of the distribution of years needed to reach WIDA Level 4.5 under the baseline six-year configuration."
 #| fig-width: 16
 #| fig-height: 5.8
 

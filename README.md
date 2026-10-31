@@ -36,14 +36,8 @@ Open **`docs/index.html`** in any browser (self-contained, works offline).
 
 **PDF of the slides:**
 <https://dbetebenner.github.io/New_Hampshire_101926_Presentation/New_Hampshire_2026_SGP_Results.pdf>
-(`docs/New_Hampshire_2026_SGP_Results.pdf`). It is a copy of
-`assets/exported_pdf/New Hampshire 2026 SGP Results.pdf`, a browser print committed
-at 09:51 on October 19. It predates that morning's later edits to the deck, so it
-does not include the three WIDA scale-transition slides (concordance clusters, the 4.5
-cut on each scale, the smoothing what-if) or the K–12 subtitle.
-
-Leave GitHub Pages off (or the repository private) until NHDOE clears the
-results for release.
+(`docs/New_Hampshire_2026_SGP_Results.pdf`), printed from the published deck, so it
+matches the slides at the address above.
 
 ## The pipeline
 
